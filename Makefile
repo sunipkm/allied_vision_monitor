@@ -46,12 +46,15 @@ GUITARGET=imagegen.out
 all: clean $(GUITARGET)
 	$(ECHO) "Built for $(UNAME_S), execute ./$(GUITARGET)"
 
-$(GUITARGET): imgui/libimgui_glfw.a
+$(GUITARGET): imgui/libimgui_glfw.a alliedcam/liballiedcam.a
 	$(CXX) -o $@ guimain.cpp stringhasher.cpp $(CXXFLAGS) imgui/libimgui_glfw.a alliedcam/liballiedcam.a $(LIBS)
 	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):alliedcam/lib ./$(GUITARGET)
 
 imgui/libimgui_glfw.a:
 	cd $(PWD)/imgui && make -j$(nproc) && cd $(PWD)
+
+alliedcam/liballiedcam.a:
+	cd $(PWD)/alliedcam && make liballiedcam.a && cd $(PWD)
 
 %.o: %.c
 	$(CC) $(EDCFLAGS) -o $@ -c $<
