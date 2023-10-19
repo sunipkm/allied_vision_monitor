@@ -1,0 +1,7 @@
+[submodule "imgui"]
+	path = imgui
+	url = https://github.com/sunipkm/imgui
+	branch = docking
+[submodule "alliedcam"]
+	path = alliedcam
+	url = https://github.com/sunipkm/allied_vision_api
