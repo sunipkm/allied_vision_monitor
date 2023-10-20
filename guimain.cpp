@@ -27,8 +27,14 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-int main(int, char**)
+int main(int argc, char *argv[])
 {
+    // setup allied camera API
+    if (allied_init_api(NULL) != VmbErrorSuccess)
+    {
+        printf("Could not initialize the Allied Camera API. Check if .cti files are in path.\n");
+        exit(EXIT_FAILURE);
+    }
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -72,7 +78,11 @@ int main(int, char**)
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    CameraList *camlist = new CameraList();
+    CameraList *camlist;
+    if (argc == 2)
+        camlist = new CameraList(argv[1]);
+    else
+        camlist = new CameraList();
 
     // Main loop
     while (!glfwWindowShouldClose(window))

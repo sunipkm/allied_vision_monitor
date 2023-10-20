@@ -13,10 +13,10 @@
 
 #include "imagetexture.hpp"
 
-#define eprintlf(fmt, ...)                                                                 \
-    {                                                                                      \
+#define eprintlf(fmt, ...)                                                                     \
+    {                                                                                          \
         fprintf(stderr, "%s:%d:%s(): " fmt "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__); \
-        fflush(stderr);                                                                    \
+        fflush(stderr);                                                                        \
     }
 
 class CaptureStat
@@ -318,6 +318,11 @@ public:
         this->info = info;
         title = info.name + " [" + info.serial + "]";
         opened = false;
+        // open_camera();
+    }
+
+    void open_camera()
+    {
         VmbError_t err = allied_open_camera(&handle, info.idstr.c_str(), 5);
         if (err != VmbErrorSuccess)
         {
@@ -326,17 +331,15 @@ public:
         }
         char *key = nullptr;
         char **arr = nullptr;
-        VmbBool_t *supported = nullptr;
         VmbUint32_t narr = 0;
         err = allied_get_image_format(handle, (const char **)&key);
         if (err == VmbErrorSuccess)
         {
-            err = allied_get_image_format_list(handle, &arr, &supported, &narr);
+            err = allied_get_image_format_list(handle, &arr, NULL, &narr);
             if (err == VmbErrorSuccess)
             {
                 pixfmts = new CharContainer((const char **)arr, narr, key);
                 free(arr);
-                free(supported);
                 narr = 0;
             }
             else
@@ -351,12 +354,11 @@ public:
         err = allied_get_sensor_bit_depth(handle, (const char **)&key);
         if (err == VmbErrorSuccess)
         {
-            err = allied_get_sensor_bit_depth_list(handle, &arr, &supported, &narr);
+            err = allied_get_sensor_bit_depth_list(handle, &arr, NULL, &narr);
             if (err == VmbErrorSuccess)
             {
                 adcrates = new CharContainer((const char **)arr, narr, (const char *)key);
-                free(arr); 
-                free(supported);   
+                free(arr);
                 narr = 0;
             }
             else
@@ -370,6 +372,29 @@ public:
         }
         tempsensors = new TempSensors(handle);
         opened = true;
+        // std::cout << "Opened!" << std::endl;
+    }
+
+    void close_camera()
+    {
+        cleanup();
+        if (pixfmts != nullptr)
+        {
+            delete pixfmts;
+            pixfmts = nullptr;
+        }
+        if (adcrates != nullptr)
+        {
+            delete adcrates;
+            adcrates = nullptr;
+        }
+        if (tempsensors != nullptr)
+        {
+            delete tempsensors;
+            tempsensors = nullptr;
+        }
+        opened = false;
+        errmsg = "";
     }
 
     void display()
@@ -393,10 +418,21 @@ public:
         {
             if (!opened)
             {
-                ImGui::TextUnformatted(errmsg.c_str());
+                if (ImGui::Button("Open Camera"))
+                {
+                    open_camera();
+                }
+                ImGui::Text("Last error: %s", errmsg.c_str());
             }
             else
             {
+                VmbError_t err;
+                bool capturing = allied_camera_acquiring(handle) || allied_camera_streaming(handle);
+                if (ImGui::Button("Close Camera"))
+                {
+                    close_camera();
+                    goto outside;
+                }
                 {
                     std::vector<double> temps;
                     const char **srcs = tempsensors->get_temps(temps);
@@ -408,8 +444,6 @@ public:
                     }
                     ImGui::Separator();
                 }
-                VmbError_t err;
-                bool capturing = allied_camera_acquiring(handle) || allied_camera_streaming(handle);
                 // get frame rate
                 if (frate_changed)
                 {
@@ -612,19 +646,23 @@ public:
                 }
                 ImGui::Separator();
                 // Image Display
-                GLuint texture = 0;
-                uint32_t width = 0, height = 0;
-                if (show)
                 {
-                    img.get_texture(texture, width, height);
+                    GLuint texture = 0;
+                    uint32_t width = 0, height = 0;
+                    if (show)
+                    {
+                        img.get_texture(texture, width, height);
+                    }
+                    ImGui::Text("ViewFinder | %u x %u", width, height);
+                    if (show)
+                    {
+                        ImGui::Image((void *)(intptr_t)texture, render_size(width, height));
+                    }
                 }
-                ImGui::Text("ViewFinder | %u x %u", width, height);
-                if (show)
-                {
-                    ImGui::Image((void *)(intptr_t)texture, render_size(width, height));
-                }
-                ImGui::End();
+            outside:
+                (void *)0;
             }
+            ImGui::End();
         }
     }
 
@@ -656,13 +694,7 @@ public:
 
     ~ImageDisplay()
     {
-        cleanup();
-        if (pixfmts != nullptr)
-            delete pixfmts;
-        if (adcrates != nullptr)
-            delete adcrates;
-        if (tempsensors != nullptr)
-            delete tempsensors;
+        close_camera();
     }
 
     static void Callback(const AlliedCameraHandle_t handle, const VmbHandle_t stream, VmbFrame_t *frame, void *user_data)

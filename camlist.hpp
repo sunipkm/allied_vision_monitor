@@ -40,6 +40,7 @@ public:
             if (err != VmbErrorSuccess) // camera with ID not found
             {
                 // log something
+                printf("Could not get camera info for %s: %s\n", inp_id.c_str(), allied_strerr(err));
                 return;
             }
             else
@@ -175,6 +176,11 @@ public:
                     {
                         win->show = true;
                         open_cams.insert(id);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Print ID"))
+                    {
+                        printf("Idx: %d | ID: %s\n", row_id, info.idstr.c_str());
                     }
                 }
             }
