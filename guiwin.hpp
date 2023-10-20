@@ -660,7 +660,7 @@ public:
                     }
                 }
             outside:
-                (void *)0;
+                assert(true);
             }
             ImGui::End();
         }
