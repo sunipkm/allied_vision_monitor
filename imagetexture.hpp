@@ -25,6 +25,7 @@ class Image
 private:
     uint32_t width;
     uint32_t height;
+    uint32_t nelem;
     uint8_t *data;
     VmbPixelFormat_t pixelFormat;
     GLuint texture = 0;
@@ -39,6 +40,7 @@ public:
     {
         width = 0;
         height = 0;
+        nelem = 0;
         texture = 0;
         fmt = GL_LUMINANCE;
         type = GL_UNSIGNED_BYTE;
@@ -62,9 +64,16 @@ public:
             return;
         }
         newdata = false;
+        // scale data
+        if (type == GL_UNSIGNED_SHORT) // 16 bits data
+        {
+            uint16_t *_data = (uint16_t *)data;
+            for (size_t i = 0; i < width * height; i++)
+                _data[i] = _data[i] << nelem;
+        }
         if (reset)
         {
-            pixfmt_to_glfmt(pixelFormat, fmt, type);
+            pixfmt_to_glfmt(pixelFormat, nelem, fmt, type);
             eprintf("Image: %u x %u | %u | %u | %u\n", width, height, pixelFormat, fmt, type);
             if (texture)
             {
@@ -139,8 +148,9 @@ private:
         self->update(frame);
     }
 
-    static void pixfmt_to_glfmt(VmbPixelFormat_t pfmt, GLenum &fmt, GLenum &type)
+    static void pixfmt_to_glfmt(VmbPixelFormat_t pfmt, uint32_t &nelem, GLenum &fmt, GLenum &type)
     {
+        nelem = 0;
         switch (pfmt)
         {
         case VmbPixelFormatMono8:
@@ -150,18 +160,17 @@ private:
         case VmbPixelFormatMono10:
             fmt = GL_LUMINANCE;
             type = GL_UNSIGNED_SHORT;
-            break;
-        case VmbPixelFormatMono10p:
-            fmt = GL_LUMINANCE;
-            type = GL_UNSIGNED_SHORT;
+            nelem = 6;
             break;
         case VmbPixelFormatMono12:
             fmt = GL_LUMINANCE;
             type = GL_UNSIGNED_SHORT;
+            nelem = 4;
             break;
         case VmbPixelFormatMono14:
             fmt = GL_LUMINANCE;
             type = GL_UNSIGNED_SHORT;
+            nelem = 2;
             break;
         case VmbPixelFormatMono16:
             fmt = GL_LUMINANCE;
@@ -202,6 +211,7 @@ private:
         default:
             fmt = GL_LUMINANCE;
             type = GL_UNSIGNED_BYTE;
+            nelem = 0;
             break;
         }
     }

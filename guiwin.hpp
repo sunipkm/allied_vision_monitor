@@ -181,6 +181,8 @@ public:
     }
 };
 
+#define TEMPSENSOR_RESPONSE 100
+
 class TempSensors
 {
 private:
@@ -204,7 +206,7 @@ private:
             std::this_thread::sleep_for(std::chrono::milliseconds(self->cadence_mod));
             for (uint32_t i = 0; i < self->cadence_loop && self->running; i++)
             {
-                std::chrono::milliseconds(16);
+                std::this_thread::sleep_for(std::chrono::milliseconds(TEMPSENSOR_RESPONSE));
             }
         }
     }
@@ -235,11 +237,11 @@ private:
     }
 
 public:
-    TempSensors(AlliedCameraHandle_t handle, uint32_t cadence_ms = 1000) // default to 50 ms cadence
+    TempSensors(AlliedCameraHandle_t handle, uint32_t cadence_ms = 1000) // default to 1 s cadence
     {
         this->handle = handle;
-        this->cadence_mod = cadence_ms % 16;
-        this->cadence_loop = cadence_ms / 16;
+        this->cadence_mod = cadence_ms % TEMPSENSOR_RESPONSE;
+        this->cadence_loop = cadence_ms / TEMPSENSOR_RESPONSE;
         VmbError_t err = allied_get_temperature_src_list(handle, &arr, &supported, &narr);
         if (err == VmbErrorSuccess)
         {
@@ -430,6 +432,14 @@ public:
                 bool capturing = allied_camera_acquiring(handle) || allied_camera_streaming(handle);
                 if (ImGui::Button("Close Camera"))
                 {
+                    close_camera();
+                    goto outside;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Reset Camera"))
+                {
+                    opened = false;
+                    allied_reset_camera(&handle);
                     close_camera();
                     goto outside;
                 }
