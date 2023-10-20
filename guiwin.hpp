@@ -13,6 +13,12 @@
 
 #include "imagetexture.hpp"
 
+#define eprintlf(fmt, ...)                                                                 \
+    {                                                                                      \
+        fprintf(stderr, "%s:%d:%s(): " fmt "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__); \
+        fflush(stderr);                                                                    \
+    }
+
 class CaptureStat
 {
 private:
@@ -156,11 +162,11 @@ public:
     {
         this->arr = new char *[narr];
         this->narr = narr;
-        this->selected = find_idx(key);
         for (int i = 0; i < narr; i++)
         {
             this->arr[i] = strdup(arr[i]);
         }
+        this->selected = find_idx(key);
     }
 
     int find_idx(const char *str)
@@ -181,7 +187,8 @@ private:
     char **arr = nullptr;
     VmbBool_t *supported = nullptr;
     VmbUint32_t narr = 0;
-    uint32_t cadence_ms = 100;
+    uint32_t cadence_mod = 100;
+    uint32_t cadence_loop = 0;
     AlliedCameraHandle_t handle = nullptr;
     bool running = false;
     bool errored = true;
@@ -194,7 +201,11 @@ private:
         while (self->running)
         {
             self->update();
-            std::this_thread::sleep_for(std::chrono::milliseconds(self->cadence_ms));
+            std::this_thread::sleep_for(std::chrono::milliseconds(self->cadence_mod));
+            for (uint32_t i = 0; i < self->cadence_loop && self->running; i++)
+            {
+                std::chrono::milliseconds(16);
+            }
         }
     }
 
@@ -204,7 +215,7 @@ private:
         if (arr == nullptr || supported == nullptr || temps.size() != narr)
             return;
         VmbError_t err;
-        for (int i = 0; i < narr; i++)
+        for (VmbUint32_t i = 0; i < narr; i++)
         {
             temps[i] = -280; // set to invalid temperature
             if (supported[i])
@@ -224,10 +235,11 @@ private:
     }
 
 public:
-    TempSensors(AlliedCameraHandle_t handle, uint32_t cadence_ms = 50) // default to 50 ms cadence
+    TempSensors(AlliedCameraHandle_t handle, uint32_t cadence_ms = 1000) // default to 50 ms cadence
     {
         this->handle = handle;
-        this->cadence_ms = cadence_ms;
+        this->cadence_mod = cadence_ms % 16;
+        this->cadence_loop = cadence_ms / 16;
         VmbError_t err = allied_get_temperature_src_list(handle, &arr, &supported, &narr);
         if (err == VmbErrorSuccess)
         {
@@ -306,23 +318,17 @@ public:
         this->info = info;
         title = info.name + " [" + info.serial + "]";
         opened = false;
-        VmbError_t err = allied_open_camera(&handle, info.idstr.c_str());
+        VmbError_t err = allied_open_camera(&handle, info.idstr.c_str(), 5);
         if (err != VmbErrorSuccess)
         {
             errmsg = "Could not open camera: " + std::string(allied_strerr(err));
-            return;
-        }
-        err = allied_alloc_framebuffer(handle, 5);
-        if (err != VmbErrorSuccess)
-        {
-            update_err(string_format("Could not allocate memory for %d frames", 5), err);
             return;
         }
         char *key = nullptr;
         char **arr = nullptr;
         VmbBool_t *supported = nullptr;
         VmbUint32_t narr = 0;
-        err = allied_get_image_format(handle, &key);
+        err = allied_get_image_format(handle, (const char **)&key);
         if (err == VmbErrorSuccess)
         {
             err = allied_get_image_format_list(handle, &arr, &supported, &narr);
@@ -342,15 +348,15 @@ public:
         {
             update_err("Could not get image format", err);
         }
-        err = allied_get_image_format(handle, &key);
+        err = allied_get_sensor_bit_depth(handle, (const char **)&key);
         if (err == VmbErrorSuccess)
         {
             err = allied_get_sensor_bit_depth_list(handle, &arr, &supported, &narr);
             if (err == VmbErrorSuccess)
             {
-                adcrates = new CharContainer((const char **)arr, narr, key);
-                free(arr);
-                free(supported);
+                adcrates = new CharContainer((const char **)arr, narr, (const char *)key);
+                free(arr); 
+                free(supported);   
                 narr = 0;
             }
             else
@@ -379,6 +385,7 @@ public:
         static double expmin, expmax, expstep;
         static double currexp;
         static double frate;
+        static double frate_changed = true;
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 512), ImVec2(INFINITY, INFINITY));
         const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
@@ -394,7 +401,7 @@ public:
                     std::vector<double> temps;
                     const char **srcs = tempsensors->get_temps(temps);
                     ImGui::Text("Temperatures:");
-                    for (int i = 0; i < temps.size(); i++)
+                    for (size_t i = 0; i < temps.size(); i++)
                     {
                         ImGui::SameLine();
                         ImGui::Text("%s: %5.2f C", srcs[i], temps[i]);
@@ -403,6 +410,13 @@ public:
                 }
                 VmbError_t err;
                 bool capturing = allied_camera_acquiring(handle) || allied_camera_streaming(handle);
+                // get frame rate
+                if (frate_changed)
+                {
+                    err = allied_get_acq_framerate(handle, &frate);
+                    update_err("Get framerate", err);
+                    frate_changed = false;
+                }
                 // Select pixel format and ADC bpp
                 if (pixfmts != nullptr && adcrates != nullptr)
                 {
@@ -418,11 +432,12 @@ public:
                             err = allied_set_image_format(handle, pixfmts->arr[sel]);
                             update_err("Set image format", err);
                             char *key = nullptr;
-                            err = allied_get_image_format(handle, &key);
+                            err = allied_get_image_format(handle, (const char **)&key);
                             if (err == VmbErrorSuccess && key != nullptr && (sel = pixfmts->find_idx(key)) != -1)
                             {
                                 // all good
                                 pixfmts->selected = sel;
+                                frate_changed = true;
                             }
                             else
                             {
@@ -434,19 +449,21 @@ public:
                     ImGui::SameLine();
                     ImGui::Text("ADC BPP:");
                     ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 8);
-                    if (ImGui::Combo(("##adcbpp" + info.idstr).c_str(), &adcrates->selected, adcrates->arr, adcrates->narr))
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 12);
+                    sel = adcrates->selected;
+                    if (ImGui::Combo(("##adcbpp" + info.idstr).c_str(), &sel, adcrates->arr, adcrates->narr))
                     {
                         if (!capturing)
                         {
                             err = allied_set_sensor_bit_depth(handle, adcrates->arr[sel]);
                             update_err("Set sensor bit depth", err);
                             char *key = nullptr;
-                            err = allied_get_sensor_bit_depth(handle, &key);
+                            err = allied_get_sensor_bit_depth(handle, (const char **)&key);
                             if (err == VmbErrorSuccess && key != nullptr && (sel = adcrates->find_idx(key)) != -1)
                             {
                                 // all good
                                 adcrates->selected = sel;
+                                frate_changed = true;
                             }
                             else
                             {
@@ -463,8 +480,7 @@ public:
                         VmbInt64_t width, height;
                         err = allied_get_image_size(handle, &width, &height);
                         update_err("Size changed", err);
-                        err = allied_get_acq_framerate(handle, &frate);
-                        update_err("Get framerate", err);
+                        frate_changed = true;
                         swid = width;
                         shgt = height;
                         size_changed = false;
@@ -531,6 +547,7 @@ public:
                         update_err("Get exposure range", err);
                         err = allied_get_exposure_us(handle, &currexp);
                         update_err("Get exposure", err);
+                        frate_changed = true;
                         exp_changed = false;
                     }
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
