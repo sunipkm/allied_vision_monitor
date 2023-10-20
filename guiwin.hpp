@@ -627,6 +627,8 @@ public:
                         stat.reset();
                         err = allied_start_capture(handle, &Callback, (void *)this); // set the callback here
                         update_err("Start capture", err);
+                        if (err != VmbErrorSuccess)
+                            pressed_start = false;
                     }
                 }
                 else
@@ -638,6 +640,8 @@ public:
                         pressed_stop = true;
                         err = allied_stop_capture(handle);
                         update_err("Stop capture", err);
+                        if (err != VmbErrorSuccess)
+                            pressed_stop = false;
                     }
                 }
                 ImGui::Separator();
