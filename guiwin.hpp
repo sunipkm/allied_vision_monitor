@@ -5,6 +5,7 @@
 #include <math.h>
 #include <chrono>
 #include <mutex>
+#include <thread>
 
 #include <alliedcam.h>
 
@@ -105,11 +106,180 @@ public:
     }
 };
 
-static void Callback(const AlliedCameraHandle_t handle, const VmbHandle_t stream, VmbFrame_t *frame, void *user_data);
+class CharContainer
+{
+private:
+    char *strdup(const char *str)
+    {
+        int len = strlen(str);
+        char *out = new char[len + 1];
+        strcpy(out, str);
+        return out;
+    }
+
+public:
+    char **arr = nullptr;
+    int narr = 0;
+    int selected;
+
+    ~CharContainer()
+    {
+        if (arr)
+        {
+            for (int i = 0; i < narr; i++)
+            {
+                delete[] arr[i];
+            }
+            delete[] arr;
+        }
+    }
+
+    CharContainer()
+    {
+        arr = nullptr;
+        narr = 0;
+        selected = -1;
+    }
+
+    CharContainer(const char **arr, int narr)
+    {
+        this->arr = new char *[narr];
+        this->narr = narr;
+        this->selected = -1;
+        for (int i = 0; i < narr; i++)
+        {
+            this->arr[i] = strdup(arr[i]);
+        }
+    }
+
+    CharContainer(const char **arr, int narr, const char *key)
+    {
+        this->arr = new char *[narr];
+        this->narr = narr;
+        this->selected = find_idx(key);
+        for (int i = 0; i < narr; i++)
+        {
+            this->arr[i] = strdup(arr[i]);
+        }
+    }
+
+    int find_idx(const char *str)
+    {
+        int res = -1;
+        for (int i = 0; i < narr; i++)
+        {
+            if (strcmp(arr[i], str) == 0)
+                res = i;
+        }
+        return res;
+    }
+};
+
+class TempSensors
+{
+private:
+    char **arr = nullptr;
+    VmbBool_t *supported = nullptr;
+    VmbUint32_t narr = 0;
+    uint32_t cadence_ms = 100;
+    AlliedCameraHandle_t handle = nullptr;
+    bool running = false;
+    bool errored = true;
+    std::thread opthread;
+    std::mutex mtx;
+    std::vector<double> temps;
+
+    static void ThreadFcn(TempSensors *self)
+    {
+        while (self->running)
+        {
+            self->update();
+            std::this_thread::sleep_for(std::chrono::milliseconds(self->cadence_ms));
+        }
+    }
+
+    void update()
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (arr == nullptr || supported == nullptr || temps.size() != narr)
+            return;
+        VmbError_t err;
+        for (int i = 0; i < narr; i++)
+        {
+            temps[i] = -280; // set to invalid temperature
+            if (supported[i])
+            {
+                err = allied_set_temperature_src(handle, arr[i]);
+                if (err != VmbErrorSuccess)
+                {
+                    continue;
+                }
+                err = allied_get_temperature(handle, &temps[i]);
+                if (err != VmbErrorSuccess)
+                {
+                    temps[i] = -280;
+                }
+            }
+        }
+    }
+
+public:
+    TempSensors(AlliedCameraHandle_t handle, uint32_t cadence_ms = 50) // default to 50 ms cadence
+    {
+        this->handle = handle;
+        this->cadence_ms = cadence_ms;
+        VmbError_t err = allied_get_temperature_src_list(handle, &arr, &supported, &narr);
+        if (err == VmbErrorSuccess)
+        {
+            temps.resize(narr);
+            errored = false;
+            running = true;
+            opthread = std::thread(ThreadFcn, this);
+            return;
+        }
+        std::cerr << "Could not get temperature sensor list: " << allied_strerr(err) << std::endl;
+        if (arr)
+            free(arr);
+        if (supported)
+            free(supported);
+        arr = nullptr;
+        supported = nullptr;
+    }
+
+    ~TempSensors()
+    {
+        if (!errored)
+        {
+            running = false;
+            opthread.join();
+        }
+        if (arr)
+            free(arr);
+        if (supported)
+            free(supported);
+    }
+
+    const char **get_temps(std::vector<double> &temps)
+    {
+        temps = this->temps;
+        return (const char **)arr;
+    }
+};
 
 class ImageDisplay
 {
 private:
+    CameraInfo info;
+    std::string title;
+    bool opened;
+    AlliedCameraHandle_t handle = nullptr;
+    std::string errmsg;
+    Image img;
+    CaptureStat stat;
+    CharContainer *pixfmts = nullptr;
+    CharContainer *adcrates = nullptr;
+    TempSensors *tempsensors = nullptr;
+
     ImVec2 render_size(uint32_t swid, uint32_t shgt)
     {
         ImVec2 avail_size = ImGui::GetContentRegionAvail();
@@ -129,13 +299,6 @@ private:
 
 public:
     bool show;
-    CameraInfo info;
-    std::string title;
-    bool opened;
-    AlliedCameraHandle_t handle = nullptr;
-    std::string errmsg;
-    Image img;
-    CaptureStat stat;
 
     ImageDisplay(const CameraInfo &info)
     {
@@ -155,6 +318,51 @@ public:
             update_err(string_format("Could not allocate memory for %d frames", 5), err);
             return;
         }
+        char *key = nullptr;
+        char **arr = nullptr;
+        VmbBool_t *supported = nullptr;
+        VmbUint32_t narr = 0;
+        err = allied_get_image_format(handle, &key);
+        if (err == VmbErrorSuccess)
+        {
+            err = allied_get_image_format_list(handle, &arr, &supported, &narr);
+            if (err == VmbErrorSuccess)
+            {
+                pixfmts = new CharContainer((const char **)arr, narr, key);
+                free(arr);
+                free(supported);
+                narr = 0;
+            }
+            else
+            {
+                update_err("Could not get image format list", err);
+            }
+        }
+        else
+        {
+            update_err("Could not get image format", err);
+        }
+        err = allied_get_image_format(handle, &key);
+        if (err == VmbErrorSuccess)
+        {
+            err = allied_get_sensor_bit_depth_list(handle, &arr, &supported, &narr);
+            if (err == VmbErrorSuccess)
+            {
+                adcrates = new CharContainer((const char **)arr, narr, key);
+                free(arr);
+                free(supported);
+                narr = 0;
+            }
+            else
+            {
+                update_err("Could not get sensor bit depth list", err);
+            }
+        }
+        else
+        {
+            update_err("Could not get image format", err);
+        }
+        tempsensors = new TempSensors(handle);
         opened = true;
     }
 
@@ -182,8 +390,72 @@ public:
             }
             else
             {
+                {
+                    std::vector<double> temps;
+                    const char **srcs = tempsensors->get_temps(temps);
+                    ImGui::Text("Temperatures:");
+                    for (int i = 0; i < temps.size(); i++)
+                    {
+                        ImGui::SameLine();
+                        ImGui::Text("%s: %5.2f C", srcs[i], temps[i]);
+                    }
+                    ImGui::Separator();
+                }
                 VmbError_t err;
                 bool capturing = allied_camera_acquiring(handle) || allied_camera_streaming(handle);
+                // Select pixel format and ADC bpp
+                if (pixfmts != nullptr && adcrates != nullptr)
+                {
+                    ImGui::Text("Pixel Format:");
+                    ImGui::SameLine();
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 10);
+                    int sel = pixfmts->selected;
+                    if (ImGui::Combo(("##pixfmt" + info.idstr).c_str(), &sel, pixfmts->arr, pixfmts->narr))
+                    {
+                        if (!capturing)
+                        {
+                            // pixfmts->selected = sel;
+                            err = allied_set_image_format(handle, pixfmts->arr[sel]);
+                            update_err("Set image format", err);
+                            char *key = nullptr;
+                            err = allied_get_image_format(handle, &key);
+                            if (err == VmbErrorSuccess && key != nullptr && (sel = pixfmts->find_idx(key)) != -1)
+                            {
+                                // all good
+                                pixfmts->selected = sel;
+                            }
+                            else
+                            {
+                                update_err("Could not get image format", err);
+                            }
+                        } // don't change if capturing
+                    }
+                    ImGui::PopItemWidth();
+                    ImGui::SameLine();
+                    ImGui::Text("ADC BPP:");
+                    ImGui::SameLine();
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 8);
+                    if (ImGui::Combo(("##adcbpp" + info.idstr).c_str(), &adcrates->selected, adcrates->arr, adcrates->narr))
+                    {
+                        if (!capturing)
+                        {
+                            err = allied_set_sensor_bit_depth(handle, adcrates->arr[sel]);
+                            update_err("Set sensor bit depth", err);
+                            char *key = nullptr;
+                            err = allied_get_sensor_bit_depth(handle, &key);
+                            if (err == VmbErrorSuccess && key != nullptr && (sel = adcrates->find_idx(key)) != -1)
+                            {
+                                // all good
+                                adcrates->selected = sel;
+                            }
+                            else
+                            {
+                                update_err("Could not get sensor bit depth", err);
+                            }
+                        }
+                    }
+                    ImGui::PopItemWidth();
+                }
                 // set width + height
                 {
                     if (size_changed)
@@ -323,14 +595,13 @@ public:
                 }
                 ImGui::Separator();
                 // Image Display
-                ImGui::Text("Image");
                 GLuint texture = 0;
                 uint32_t width = 0, height = 0;
                 if (show)
                 {
                     img.get_texture(texture, width, height);
                 }
-                ImGui::Text("Texture: %d | %u x %u | %d", texture, width, height, (int)ImGui::GetWindowWidth());
+                ImGui::Text("ViewFinder | %u x %u", width, height);
                 if (show)
                 {
                     ImGui::Image((void *)(intptr_t)texture, render_size(width, height));
@@ -369,13 +640,19 @@ public:
     ~ImageDisplay()
     {
         cleanup();
+        if (pixfmts != nullptr)
+            delete pixfmts;
+        if (adcrates != nullptr)
+            delete adcrates;
+        if (tempsensors != nullptr)
+            delete tempsensors;
+    }
+
+    static void Callback(const AlliedCameraHandle_t handle, const VmbHandle_t stream, VmbFrame_t *frame, void *user_data)
+    {
+        assert(user_data);
+        ImageDisplay *self = (ImageDisplay *)user_data;
+        self->stat.update();
+        self->img.update(frame);
     }
 };
-
-static void Callback(const AlliedCameraHandle_t handle, const VmbHandle_t stream, VmbFrame_t *frame, void *user_data)
-{
-    assert(user_data);
-    ImageDisplay *self = (ImageDisplay *)user_data;
-    self->stat.update();
-    self->img.update(frame);
-}
