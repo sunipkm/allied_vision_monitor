@@ -6,6 +6,7 @@
 #include <chrono>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 #include <alliedcam.h>
 
@@ -401,13 +402,14 @@ public:
 
     void display()
     {
+        static bool bin_changed = true;
         static bool size_changed = true;
         static bool ofst_changed = true;
         static bool exp_changed = true;
         static bool pressed_start = false;
         static bool pressed_stop = false;
 
-        static int swid, shgt;
+        static int swid, shgt, sbin;
         static int ofx, ofy;
         static double expmin, expmax, expstep;
         static double currexp;
@@ -517,6 +519,37 @@ public:
                     }
                     ImGui::PopItemWidth();
                 }
+                // set binning
+                {
+                    if (bin_changed)
+                    {
+                        VmbInt64_t bin;
+                        err = allied_get_binning_factor(handle, &bin);
+                        update_err("Binning changed", err);
+                        sbin = bin;
+                        bin_changed = false;
+                    }
+                    ImGui::Text("Image Bin:");
+                    ImGui::SameLine();
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
+                    if (ImGui::InputInt(("##bin" + info.idstr).c_str(), &sbin, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
+                    {
+                        if (sbin < 1)
+                            sbin = 1;
+                    }
+                    ImGui::PopItemWidth();
+                    if (ImGui::SmallButton(("Update##Bin" + info.idstr).c_str()) && !capturing)
+                    {
+                        bin_changed = true;
+                        size_changed = true;
+                        ofst_changed = true;
+                        err = allied_set_binning_factor(handle, sbin);
+                        if (err != VmbErrorSuccess)
+                        {
+                            errmsg = string_format("Could not set binning to %d: ", sbin) + std::string(allied_strerr(err));
+                        }
+                    }
+                }
                 // set width + height
                 {
                     if (size_changed)
@@ -564,16 +597,16 @@ public:
                     ImGui::Text("Image Offset:");
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    ImGui::InputInt(("##ofstx" + info.idstr).c_str(), &ofx, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
+                    ImGui::InputInt(("##ofstx" + info.idstr).c_str(), &ofx, 0, 0, 0);
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::Text(" x ");
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    ImGui::InputInt(("##ofsty" + info.idstr).c_str(), &ofy, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
+                    ImGui::InputInt(("##ofsty" + info.idstr).c_str(), &ofy, 0, 0, 0);
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
-                    if (ImGui::SmallButton(("Update##Ofst" + info.idstr).c_str()) && !capturing)
+                    if (ImGui::SmallButton(("Update##Ofst" + info.idstr).c_str()))
                     {
                         ofst_changed = true;
                         err = allied_set_image_ofst(handle, ofx, ofy);
@@ -625,6 +658,8 @@ public:
                     {
                         pressed_start = true;
                         stat.reset();
+                        img.collision = 0;
+                        img.stall = 0;
                         err = allied_start_capture(handle, &Callback, (void *)this); // set the callback here
                         update_err("Start capture", err);
                         if (err != VmbErrorSuccess)
@@ -667,7 +702,7 @@ public:
                     {
                         img.get_texture(texture, width, height);
                     }
-                    ImGui::Text("ViewFinder | %u x %u", width, height);
+                    ImGui::Text("ViewFinder | %u x %u | Collision: %u, Stall: %u", width, height, img.collision, img.stall);
                     if (show)
                     {
                         ImGui::Image((void *)(intptr_t)texture, render_size(width, height));

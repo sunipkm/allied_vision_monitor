@@ -114,6 +114,7 @@ public:
         {
             // reading from this frame, lock!
             std::lock_guard<std::mutex> lock(mtx);
+            stall++;
             // now do stuff and get out
             unsafe_update(frame);
             return;
@@ -121,6 +122,7 @@ public:
         // not reading from this frame, check if it is rendering
         else if (!mtx.try_lock())
         {
+            collision++;
             return; // rendering, so don't update
         }
         // not rendering, so update
@@ -215,4 +217,7 @@ private:
             break;
         }
     }
+public:
+    uint32_t collision = 0;
+    uint32_t stall = 0;
 };
