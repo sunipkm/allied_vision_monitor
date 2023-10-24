@@ -419,6 +419,7 @@ public:
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 512), ImVec2(INFINITY, INFINITY));
         const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
         if (show && ImGui::Begin(title.c_str(), &show))
+        ImGui::PushID(title.c_str());
         {
             if (!opened)
             {
@@ -470,7 +471,7 @@ public:
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 10);
                     int sel = pixfmts->selected;
-                    if (ImGui::Combo(("##pixfmt" + info.idstr).c_str(), &sel, pixfmts->arr, pixfmts->narr))
+                    if (ImGui::Combo("##pixfmt", &sel, pixfmts->arr, pixfmts->narr))
                     {
                         if (!capturing)
                         {
@@ -497,7 +498,7 @@ public:
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 12);
                     sel = adcrates->selected;
-                    if (ImGui::Combo(("##adcbpp" + info.idstr).c_str(), &sel, adcrates->arr, adcrates->narr))
+                    if (ImGui::Combo("##adcbpp", &sel, adcrates->arr, adcrates->narr))
                     {
                         if (!capturing)
                         {
@@ -532,13 +533,14 @@ public:
                     ImGui::Text("Image Bin:");
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    if (ImGui::InputInt(("##bin" + info.idstr).c_str(), &sbin, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
+                    if (ImGui::InputInt("##bin", &sbin, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
                     {
                         if (sbin < 1)
                             sbin = 1;
                     }
                     ImGui::PopItemWidth();
-                    if (ImGui::SmallButton(("Update##Bin" + info.idstr).c_str()) && !capturing)
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Update##Bin") && !capturing)
                     {
                         bin_changed = true;
                         size_changed = true;
@@ -565,13 +567,13 @@ public:
                     ImGui::Text("Image Size:");
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    ImGui::InputInt(("##width" + info.idstr).c_str(), &swid, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
+                    ImGui::InputInt("##width", &swid, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     ImGui::Text(" x ");
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    ImGui::InputInt(("##height" + info.idstr).c_str(), &shgt, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
+                    ImGui::InputInt("##height", &shgt, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
                     if (ImGui::SmallButton(("Update##Size" + info.idstr).c_str()) && !capturing)
@@ -606,7 +608,7 @@ public:
                     ImGui::InputInt(("##ofsty" + info.idstr).c_str(), &ofy, 0, 0, 0);
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
-                    if (ImGui::SmallButton(("Update##Ofst" + info.idstr).c_str()))
+                    if (ImGui::SmallButton("Update##Ofst"))
                     {
                         ofst_changed = true;
                         err = allied_set_image_ofst(handle, ofx, ofy);
@@ -628,7 +630,7 @@ public:
                         exp_changed = false;
                     }
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
-                    if (ImGui::InputDouble(("Exposure (us)##" + info.idstr).c_str(), &currexp, expstep, ImGuiInputTextFlags_EnterReturnsTrue))
+                    if (ImGui::InputDouble("Exposure (us)", &currexp, expstep, ImGuiInputTextFlags_EnterReturnsTrue))
                     {
                         if (currexp < expmin)
                             currexp = expmin;
@@ -637,7 +639,7 @@ public:
                     }
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
-                    if (ImGui::SmallButton(("Update##Exposure" + info.idstr).c_str()))
+                    if (ImGui::SmallButton("Update##Exposure"))
                     {
                         if (currexp < expmin)
                             currexp = expmin;
@@ -654,7 +656,7 @@ public:
                 {
                     if (pressed_stop)
                         pressed_stop = false;
-                    if (ImGui::Button(("Start Capture##" + info.idstr).c_str()) && !pressed_start)
+                    if (ImGui::Button("Start Capture") && !pressed_start)
                     {
                         pressed_start = true;
                         stat.reset();
@@ -670,7 +672,7 @@ public:
                 {
                     if (pressed_start)
                         pressed_start = false;
-                    if (ImGui::Button(("Stop Capture##" + info.idstr).c_str()) && !pressed_stop)
+                    if (ImGui::Button("Stop Capture") && !pressed_stop)
                     {
                         pressed_stop = true;
                         err = allied_stop_capture(handle);
@@ -689,7 +691,7 @@ public:
                 ImGui::Separator();
                 // Error message display
                 ImGui::Text("Last error: %s", errmsg.c_str());
-                if (ImGui::Button(("Clear##" + info.idstr).c_str()))
+                if (ImGui::Button("Clear"))
                 {
                     errmsg = "";
                 }
@@ -711,6 +713,7 @@ public:
             outside:
                 assert(true);
             }
+            ImGui::PopID();
             ImGui::End();
         }
     }
