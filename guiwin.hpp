@@ -406,8 +406,10 @@ public:
         static bool size_changed = true;
         static bool ofst_changed = true;
         static bool exp_changed = true;
+        static bool luma_changed = true;
         static bool pressed_start = false;
         static bool pressed_stop = false;
+        static bool led_on = true;
 
         static int swid, shgt, sbin;
         static int ofx, ofy;
@@ -445,6 +447,33 @@ public:
                     allied_reset_camera(&handle);
                     close_camera();
                     goto outside;
+                }
+                ImGui::SameLine();
+                {
+                    if (luma_changed)
+                    {
+                        luma_changed = false;
+                        VmbInt64_t luma;
+                        err = allied_get_indicator_luma(handle, &luma);
+                        update_err("Getting indicator status", err);
+                        if (err == VmbErrorSuccess)
+                        {
+                            led_on = luma > 0;
+                        }
+                    }
+                    if (ImGui::Checkbox("LED", &led_on))
+                    {
+                        if (led_on)
+                        {
+                            err = allied_set_indicator_luma(handle, 10);
+                        }
+                        else
+                        {
+                            err = allied_set_indicator_luma(handle, 0);
+                        }
+                        update_err("Setting indicator status", err);
+                        luma_changed = true;
+                    }
                 }
                 {
                     std::vector<double> temps;
