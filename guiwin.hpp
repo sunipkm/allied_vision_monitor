@@ -415,7 +415,8 @@ public:
         static int ofx, ofy;
         static double expmin, expmax, expstep;
         static double currexp;
-        static double frate;
+        static double frate, frate_min, frate_max;
+        static bool frate_auto = true;
         static double frate_changed = true;
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 512), ImVec2(INFINITY, INFINITY));
@@ -489,8 +490,11 @@ public:
                 // get frame rate
                 if (frate_changed)
                 {
+                    double dummy;
                     err = allied_get_acq_framerate(handle, &frate);
                     update_err("Get framerate", err);
+                    err = allied_get_acq_framerate_range(handle, &frate_min, &frate_max, &dummy);
+                    update_err("Get framerate range", err);
                     frate_changed = false;
                 }
                 // Select pixel format and ADC bpp
@@ -677,6 +681,37 @@ public:
                         err = allied_set_exposure_us(handle, currexp);
                         update_err("Update exposure", err);
                         exp_changed = true;
+                        stat.reset();
+                    }
+                }
+                // set framerate
+                {
+                    if (ImGui::Checkbox("Auto Frame Rate", &frate_auto))
+                    {
+                        err = allied_set_acq_framerate_auto(handle, frate_auto);
+                        update_err("Auto frame rate set", frate_auto);
+                        err = allied_get_acq_framerate_auto(handle, &frate_auto);
+                        update_err("Auto frame rate get", err);
+                    }
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
+                    if (ImGui::InputDouble("Frame Rate (Hz)", &frate, 0, 0, "%.4f", frate_auto ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_ReadOnly))
+                    {
+                        if (frate < frate_min)
+                            frate = frate_min;
+                        if (frate > frate_max)
+                            frate = frate_max;
+                    }
+                    ImGui::PopItemWidth();
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Update##FrameRate") && !frate_auto)
+                    {
+                        if (frate < frate_min)
+                            frate = frate_min;
+                        if (frate > frate_max)
+                            frate = frate_max;
+                        err = allied_set_acq_framerate(handle, frate);
+                        update_err("Set frame rate", err);
+                        frate_changed = true;
                         stat.reset();
                     }
                 }
