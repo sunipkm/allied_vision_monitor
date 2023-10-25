@@ -686,11 +686,20 @@ public:
                 }
                 // set framerate
                 {
+                    bool old_frate_auto = frate_auto;
                     if (ImGui::Checkbox("Auto Frame Rate", &frate_auto))
                     {
                         err = allied_set_acq_framerate_auto(handle, frate_auto);
+                        if (err != VmbErrorSuccess)
+                        {
+                            frate_auto = old_frate_auto;
+                        }
                         update_err("Auto frame rate set", frate_auto);
                         err = allied_get_acq_framerate_auto(handle, &frate_auto);
+                        if (err != VmbErrorSuccess)
+                        {
+                            frate_auto = old_frate_auto;
+                        }
                         update_err("Auto frame rate get", err);
                     }
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
