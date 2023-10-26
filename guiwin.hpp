@@ -417,12 +417,12 @@ public:
         static double currexp;
         static double frate, frate_min, frate_max;
         static bool frate_auto = true;
-        static double frate_changed = true;
+        static bool frate_changed = true;
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 512), ImVec2(INFINITY, INFINITY));
         const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
         if (show && ImGui::Begin(title.c_str(), &show))
-        ImGui::PushID(title.c_str());
+            ImGui::PushID(title.c_str());
         {
             if (!opened)
             {
@@ -694,16 +694,17 @@ public:
                         {
                             frate_auto = old_frate_auto;
                         }
-                        update_err("Auto frame rate set", frate_auto);
+                        update_err("Auto frame rate set", err);
                         err = allied_get_acq_framerate_auto(handle, &frate_auto);
                         if (err != VmbErrorSuccess)
                         {
                             frate_auto = old_frate_auto;
                         }
                         update_err("Auto frame rate get", err);
+                        frate_changed = true;
                     }
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
-                    if (ImGui::InputDouble("Frame Rate (Hz)", &frate, 0, 0, "%.4f", frate_auto ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_ReadOnly))
+                    if (ImGui::InputDouble("Frame Rate (Hz)", &frate, 0, 0, "%.4f", frate_auto ? ImGuiInputTextFlags_ReadOnly : ImGuiInputTextFlags_EnterReturnsTrue))
                     {
                         if (frate < frate_min)
                             frate = frate_min;
