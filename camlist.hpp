@@ -18,6 +18,8 @@
 
 #include "stringhasher.hpp"
 
+#include "aDIO_library.h"
+
 class CameraList
 {
 public:
@@ -26,6 +28,7 @@ public:
     std::map<uint32_t, ImageDisplay *> camstructs;
     std::map<uint32_t, CameraInfo> caminfos;
     std::string inp_id = "";
+    DeviceHandle adio_dev = nullptr;
     StringHasher *hashgen;
 
     void refresh_list()
@@ -105,13 +108,9 @@ public:
         // std::cout << "Cam structs size: " << camstructs.size() << std::endl;
     }
 
-    CameraList(const char *id = nullptr)
+    CameraList(std::string id, DeviceHandle adio_dev) : adio_dev(adio_dev), inp_id(id)
     {
         hashgen = new StringHasher;
-        if (id != nullptr)
-        {
-            inp_id = std::string(id); // store the ID
-        }
         refresh_list();
     }
 

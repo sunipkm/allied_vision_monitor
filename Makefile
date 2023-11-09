@@ -6,8 +6,8 @@ PWD=$(shell pwd)
 CDR=$(shell pwd)
 ECHO=echo
 
-EDCFLAGS:=$(CFLAGS) -I include/ -I alliedcam/include -Wall -std=gnu11
-EDLDFLAGS:=$(LDFLAGS) -lpthread -lm -L alliedcam/lib -lVmbC
+EDCFLAGS:=$(CFLAGS) -I include/ -I alliedcam/include -I rtd_adio/include -Wall -std=gnu11
+EDLDFLAGS:=$(LDFLAGS) -lpthread -lm -L alliedcam/lib -lVmbC -L rtd_adio/lib -lrtd-aDIO
 EDDEBUG:=$(DEBUG)
 
 ifeq ($(ARCH),UNDEFINED)
@@ -46,7 +46,7 @@ GUITARGET=imagegen.out
 all: clean $(GUITARGET)
 	$(ECHO) "Built for $(UNAME_S), execute ./$(GUITARGET)"
 
-$(GUITARGET): imgui/libimgui_glfw.a alliedcam/liballiedcam.a
+$(GUITARGET): imgui/libimgui_glfw.a alliedcam/liballiedcam.a rtd_adio/lib/librtd-aDIO.a
 	$(CXX) -o $@ guimain.cpp stringhasher.cpp $(CXXFLAGS) imgui/libimgui_glfw.a alliedcam/liballiedcam.a $(LIBS)
 	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):alliedcam/lib ./$(GUITARGET)
 
@@ -55,6 +55,9 @@ imgui/libimgui_glfw.a:
 
 alliedcam/liballiedcam.a:
 	cd $(PWD)/alliedcam && make liballiedcam.a && cd $(PWD)
+
+rtd_adio/lib/librtd-aDIO.a:
+	cd $(PWD)/rtd_adio/lib && make && cd $(PWD)
 
 %.o: %.c
 	$(CC) $(EDCFLAGS) -o $@ -c $<

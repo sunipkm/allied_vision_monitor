@@ -13,6 +13,10 @@
 #include "backend/imgui_impl_glfw.h"
 #include "backend/imgui_impl_opengl2.h"
 #include <stdio.h>
+#include <unistd.h>
+
+#include "aDIO_library.h"
+
 #ifdef __APPLE__
 #define GL_SILENCE_DEPRECATION
 #endif
@@ -29,6 +33,48 @@ static void glfw_error_callback(int error, const char* description)
 
 int main(int argc, char *argv[])
 {
+    // arguments
+    std::string camera_id = "";
+    int adio_minor_num = 0;
+    bool adio_init = true;
+    // process args
+    int c;
+    while ((c = getopt(argc, argv, "c:a:h")) != -1)
+    {
+        switch (c)
+        {
+            case 'c':
+            {
+                printf("Camera ID from command line: %s\n", optarg);
+                camera_id = optarg;
+                break;
+            }
+            case 'a':
+            {
+                printf("ADIO minor number: %s\n", optarg);
+                adio_minor_num = atoi(optarg);
+                break;
+            }
+            case 'h':
+            default:
+            {
+                printf("\nUsage: %s [-c camera_id] [-a adio_minor_num] [-h Show this message]\n\n", argv[0]);
+                exit(EXIT_SUCCESS);
+            }
+        }
+    }
+    // setup ADIO API
+    DeviceHandle adio_dev = nullptr;
+    if (OpenDIO_aDIO(&adio_dev, adio_minor_num) != 0)
+    {
+        printf("Could not initialize ADIO API. Check if /dev/rtd-aDIO* exists. aDIO features will be disabled.\n");
+        adio_init = false;
+    }
+    if (!adio_init)
+    {
+        free(adio_dev);
+        adio_dev = nullptr;
+    }
     // setup allied camera API
     if (allied_init_api(NULL) != VmbErrorSuccess)
     {
@@ -79,10 +125,7 @@ int main(int argc, char *argv[])
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     CameraList *camlist;
-    if (argc == 2)
-        camlist = new CameraList(argv[1]);
-    else
-        camlist = new CameraList();
+    camlist = new CameraList(camera_id, adio_dev);
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -127,6 +170,8 @@ int main(int argc, char *argv[])
     ImGui::DestroyContext();
 
     delete camlist;
+    if (adio_dev != nullptr)
+        CloseDIO_aDIO(adio_dev);
 
     glfwDestroyWindow(window);
     glfwTerminate();
