@@ -293,7 +293,12 @@ private:
     CaptureStat stat;
     CharContainer *pixfmts = nullptr;
     CharContainer *adcrates = nullptr;
+    CharContainer *triglines = nullptr;
+    CharContainer *trigsrcs = nullptr;
     TempSensors *tempsensors = nullptr;
+    DeviceHandle adio_hdl = nullptr;
+    unsigned char state = 0;
+    bool capturing;
 
     ImVec2 render_size(uint32_t swid, uint32_t shgt)
     {
@@ -314,11 +319,13 @@ private:
 
 public:
     bool show;
+    int adio_bit = -1;
 
-    ImageDisplay(const CameraInfo &info)
+    ImageDisplay(const CameraInfo &info, const DeviceHandle &adio_hdl)
     {
         show = false;
         this->info = info;
+        this->adio_hdl = adio_hdl;
         title = info.name + " [" + info.serial + "]";
         opened = false;
         // open_camera();
@@ -373,6 +380,62 @@ public:
         {
             update_err("Could not get image format", err);
         }
+        err = allied_get_trigline(handle, &key);
+        if (err == VmbErrorSuccess)
+        {
+            err = allied_get_triglines_list(handle, &arr, NULL, &narr);
+            if (err == VmbErrorSuccess)
+            {
+                triglines = new CharContainer((const char **)arr, narr, (const char *)key);
+                free(arr);
+                narr = 0;
+            }
+            else
+            {
+                update_err("Could not get trigger lines list", err);
+            }
+        }
+        else
+        {
+            update_err("Could not get selected trigger line", err);
+        }
+        if (triglines != nullptr)
+        {
+            // set all trigger lines to output
+            for (int i = 0; i < triglines->narr; i++)
+            {
+                char *line = triglines->arr[i];
+                err = allied_set_trigline(handle, line);
+                if (err != VmbErrorSuccess)
+                {
+                    update_err(string_format("Could not select line %s", line), err);
+                }
+                else
+                {
+                    err = allied_set_trigline_mode(handle, "Output");
+                    update_err(string_format("Could not set line %s to output", line), err);
+                }
+            }
+            err = allied_set_trigline(handle, key);
+            update_err(string_format("Could not select line %s", key), err);
+            // get trigger source
+            err = allied_get_trigline_src(handle, (const char **)&key);
+            if (err == VmbErrorSuccess)
+            {
+                err = allied_get_trigline_src_list(handle, &arr, NULL, &narr);
+                if (err == VmbErrorSuccess)
+                {
+                    trigsrcs = new CharContainer((const char **)arr, narr, (const char *)key);
+                    free(arr);
+                    narr = 0;
+                }
+                else
+                {
+                    update_err("Could not get trigger sources list", err);
+                }
+            }
+        }
+
         tempsensors = new TempSensors(handle);
         opened = true;
         // std::cout << "Opened!" << std::endl;
@@ -390,6 +453,16 @@ public:
         {
             delete adcrates;
             adcrates = nullptr;
+        }
+        if (triglines != nullptr)
+        {
+            delete triglines;
+            triglines = nullptr;
+        }
+        if (trigsrcs != nullptr)
+        {
+            delete trigsrcs;
+            trigsrcs = nullptr;
         }
         if (tempsensors != nullptr)
         {
@@ -418,6 +491,7 @@ public:
         static double frate, frate_min, frate_max;
         static bool frate_auto = true;
         static bool frate_changed = true;
+        static bool trigline_changed = true;
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 512), ImVec2(INFINITY, INFINITY));
         const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
@@ -435,7 +509,7 @@ public:
             else
             {
                 VmbError_t err;
-                bool capturing = allied_camera_acquiring(handle) || allied_camera_streaming(handle);
+                capturing = allied_camera_acquiring(handle) || allied_camera_streaming(handle);
                 if (ImGui::Button("Close Camera"))
                 {
                     close_camera();
@@ -725,6 +799,66 @@ public:
                         stat.reset();
                     }
                 }
+                // select trigger line and source
+                if (triglines != nullptr && trigsrcs != nullptr)
+                {
+                    if (trigline_changed) // trig line changed, update source selection
+                    {
+                        int sel = trigsrcs->selected;
+                        const char *key;
+                        err = allied_get_trigline_src(handle, &key);
+                        update_err("Could not get trigline source", err);
+                        sel = trigsrcs->find_idx(key);
+                        if (sel >= 0)
+                            trigsrcs->selected = sel;
+                        trigline_changed = false;
+                    }
+                    ImGui::Text("Trigger Line:");
+                    ImGui::SameLine();
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 10);
+                    int sel = triglines->selected;
+                    if (ImGui::Combo("##trigline", &sel, triglines->arr, triglines->narr) && !capturing)
+                    {
+                        err = allied_set_trigline(handle, triglines->arr[sel]);
+                        update_err("Select trigger line", err);
+                        if (err != VmbErrorSuccess)
+                        {
+                            goto trigline_clear;
+                        }
+                        char *key = nullptr;
+                        err = allied_get_trigline(handle, &key);
+                        if (err == VmbErrorSuccess && key != nullptr && (sel = triglines->find_idx(key)) != -1)
+                        {
+                            // all good
+                            triglines->selected = sel;
+                            trigline_changed = true;
+                            goto trigline_clear;
+                        }
+                        else
+                        {
+                            update_err("Could not get trigger line", err);
+                        }
+                    }
+                    sel = trigsrcs->selected;
+                    if (ImGui::Combo("##trigsrc", &sel, trigsrcs->arr, trigsrcs->narr) && !capturing)
+                    {
+                        err = allied_set_trigline_src(handle, trigsrcs->arr[sel]);
+                        update_err("Select trigger src", err);
+                        const char *key = nullptr;
+                        err = allied_get_trigline_src(handle, &key);
+                        if (err == VmbErrorSuccess && key != nullptr && (sel = trigsrcs->find_idx(key)) != -1)
+                        {
+                            // all good
+                            trigsrcs->selected = sel;
+                        }
+                        else
+                        {
+                            update_err("Could not get trigline src", err);
+                        }
+                    }
+trigline_clear:
+                    assert(true);
+                }
                 // Start/stop capture
                 if (!capturing)
                 {
@@ -818,6 +952,11 @@ public:
         }
     }
 
+    bool running()
+    {
+        return capturing;
+    }
+
     ~ImageDisplay()
     {
         close_camera();
@@ -827,6 +966,11 @@ public:
     {
         assert(user_data);
         ImageDisplay *self = (ImageDisplay *)user_data;
+        if (self->adio_hdl != nullptr && self->adio_bit > 0)
+        {
+            self->state = ~self->state;
+            WriteBit_aDIO(self->adio_hdl, 0, self->adio_bit, self->state);
+        }
         self->stat.update();
         self->img.update(frame);
     }

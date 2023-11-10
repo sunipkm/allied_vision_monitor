@@ -20,6 +20,20 @@
 
 #include "aDIO_library.h"
 
+static std::map<uint32_t, int> adio_used;
+
+static const char *adio_list[] = {
+    "None",
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+};
+
 class CameraList
 {
 public:
@@ -28,8 +42,39 @@ public:
     std::map<uint32_t, ImageDisplay *> camstructs;
     std::map<uint32_t, CameraInfo> caminfos;
     std::string inp_id = "";
+    std::string errstr = "";
     DeviceHandle adio_dev = nullptr;
     StringHasher *hashgen;
+
+    void update_err(int devidx, const char *errmsg)
+    {
+        errstr = "Device " + std::to_string(devidx) + ": " + errmsg;
+    }
+
+    void update_err(int devidx, std::string &errmsg)
+    {
+        errstr = "Device " + std::to_string(devidx) + ": " + errmsg;
+    }
+
+    void update_err(int devidx, std::string errmsg)
+    {
+        errstr = "Device " + std::to_string(devidx) + ": " + errmsg;
+    }
+
+    void update_err(const char *errmsg)
+    {
+        errstr = errmsg;
+    }
+
+    void update_err(std::string &errmsg)
+    {
+        errstr = errmsg;
+    }
+
+    void update_err(std::string errmsg)
+    {
+        errstr = errmsg;
+    }
 
     void refresh_list()
     {
@@ -44,6 +89,7 @@ public:
             {
                 // log something
                 printf("Could not get camera info for %s: %s\n", inp_id.c_str(), allied_strerr(err));
+                update_err(string_format("Could not get camera info for %s: %s\n", inp_id.c_str(), allied_strerr(err)));
                 return;
             }
             else
@@ -84,7 +130,7 @@ public:
             {
                 uint32_t val = cinfo->first;
                 CameraInfo cf = cinfo->second;
-                camstructs[val] = new ImageDisplay(cf);
+                camstructs[val] = new ImageDisplay(cf, adio_dev);
             }
             // std::cout << "Cam structs size: " << camstructs.size() << std::endl;
             return;
@@ -108,8 +154,10 @@ public:
         // std::cout << "Cam structs size: " << camstructs.size() << std::endl;
     }
 
-    CameraList(std::string id, DeviceHandle adio_dev) : adio_dev(adio_dev), inp_id(id)
+    CameraList(std::string id, DeviceHandle adio_dev)
     {
+        this->adio_dev = adio_dev;
+        this->inp_id = inp_id;
         hashgen = new StringHasher;
         refresh_list();
     }
@@ -134,11 +182,12 @@ public:
             ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY;
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 512), ImVec2(INFINITY, INFINITY));
         ImGui::Begin("Camera List");
-        if (camstructs.size() && ImGui::BeginTable("camera_table", 4, flags, outer_size_value))
+        if (camstructs.size() && ImGui::BeginTable("camera_table", 5, flags, outer_size_value))
         {
             ImGui::TableSetupColumn("Idx", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoHide);
             ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoHide);
             ImGui::TableSetupColumn("Serial", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoHide);
+            ImGui::TableSetupColumn("ADIO", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoHide);
 
             ImGui::TableHeadersRow();
 
@@ -168,8 +217,43 @@ public:
                 // serial
                 if (ImGui::TableSetColumnIndex(2))
                     ImGui::TextUnformatted(info.serial.c_str());
-                // button
+                // combo
                 if (ImGui::TableSetColumnIndex(3))
+                {
+                    bool capturing = win->running();
+                    int oldsel = win->adio_bit + 1;
+                    int sel = oldsel;
+                    if (ImGui::Combo("", &sel, adio_list, IM_ARRAYSIZE(adio_list)) && !capturing)
+                    {
+                        if (adio_dev == nullptr) // not available, set to none
+                        {
+                            sel = 0;
+                        }
+                        if (sel != oldsel) // selection changed
+                        {
+                            auto entry = adio_used.find(oldsel - 1); // find the old selection
+                            if (entry != adio_used.end()) // if found
+                                adio_used.erase(entry);
+                        }
+                        if (sel > 0) // non zero selected
+                        {
+                            auto entry = adio_used.find(sel - 1); // find the new selection
+                            if (entry != adio_used.end() && entry->second != row_id) // found this bit
+                            {
+                                sel = 0; // you can not select this, and you have already lost the one you had selected
+                                update_err(row_id, string_format("Bit %d assigned to %d.", entry->first, entry->second)); // error message
+                            }
+                            else // did not find this bit, claim it
+                            {
+                                adio_used.insert({sel - 1, row_id});
+                            }
+                        }
+                        win->adio_bit = sel - 1; // update selection
+                        eprintlf("ADIO Sel: %d -> %d", oldsel, sel);
+                    }
+                }
+                // button
+                if (ImGui::TableSetColumnIndex(4))
                 {
                     if (ImGui::SmallButton("Open"))
                     {
@@ -193,6 +277,15 @@ public:
         if (ImGui::Button("Refresh"))
         {
             refresh_list();
+        }
+        ImGui::Separator();
+        if (errstr.length())
+        {
+            ImGui::Text("Error: %s", errstr.c_str());
+        }
+        if (ImGui::Button("Clear##ErrorMsg"))
+        {
+            errstr = "";
         }
         ImGui::Separator();
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);

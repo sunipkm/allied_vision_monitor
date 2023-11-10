@@ -17,7 +17,7 @@ endif
 UNAME_S := $(shell uname -s)
 
 EDCFLAGS+= -I include/ -I ./ -Wall -O2 -std=gnu11 -I imgui/libs/gl3w -DIMGUI_IMPL_OPENGL_LOADER_GL3W
-CXXFLAGS:= -I alliedcam/include -I include/ -I imgui/include -Wall -O2 -fpermissive -std=gnu++11 -I imgui/libs/gl3w -DIMGUI_IMPL_OPENGL_LOADER_GL3W $(CXXFLAGS)
+CXXFLAGS:= -I alliedcam/include -I rtd_adio/include -I include/ -I imgui/include -Wall -O2 -fpermissive -std=gnu++11 -I imgui/libs/gl3w -DIMGUI_IMPL_OPENGL_LOADER_GL3W $(CXXFLAGS)
 LIBS = -lpthread
 
 ifeq ($(UNAME_S), Linux) #LINUX
@@ -37,7 +37,7 @@ ifeq ($(UNAME_S), Darwin) #APPLE
 	CFLAGS = $(CXXFLAGS)
 endif
 
-LIBS += -L alliedcam/lib -lVmbC
+LIBS += -L alliedcam/lib -lVmbC -L rtd_adio/lib -lrtd-aDIO
 
 all: CFLAGS+= -O2
 

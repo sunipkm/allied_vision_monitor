@@ -75,6 +75,22 @@ int main(int argc, char *argv[])
         free(adio_dev);
         adio_dev = nullptr;
     }
+    else
+    {
+        // set up port A as output and set all bits to low
+        int ret = LoadPort0BitDir_aDIO(adio_dev, 1, 1, 1, 1, 1, 1, 1, 1);
+        if (ret == -1)
+        {
+            printf("Could not set PORT0 to output.\n");
+            goto done_allied;
+        }
+        ret = WritePort_aDIO(adio_dev, 0, 0); // set all to low
+        if (ret < 0)
+        {
+            printf("Could not set all PORT0 bits to LOW: %s [%d]\n", strerror(ret), ret);
+        }
+    }
+done_allied:
     // setup allied camera API
     if (allied_init_api(NULL) != VmbErrorSuccess)
     {
