@@ -69,6 +69,8 @@ rtd_adio/lib/librtd-aDIO.a:
 
 clean:
 	$(RM) $(GUITARGET)
+	cd $(PWD)/rtd_adio/lib && make clean && cd $(PWD)
+	cd $(PWD)/alliedcam && make clean && cd $(PWD)
 
 spotless: clean
 	cd $(PWD)/imgui && make spotless && cd $(PWD)

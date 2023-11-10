@@ -380,7 +380,7 @@ public:
         {
             update_err("Could not get image format", err);
         }
-        err = allied_get_trigline(handle, &key);
+        err = allied_get_trigline(handle, (const char **)&key);
         if (err == VmbErrorSuccess)
         {
             err = allied_get_triglines_list(handle, &arr, NULL, &narr);
@@ -825,7 +825,7 @@ public:
                         {
                             goto trigline_clear;
                         }
-                        char *key = nullptr;
+                        const char *key = nullptr;
                         err = allied_get_trigline(handle, &key);
                         if (err == VmbErrorSuccess && key != nullptr && (sel = triglines->find_idx(key)) != -1)
                         {
@@ -839,6 +839,9 @@ public:
                             update_err("Could not get trigger line", err);
                         }
                     }
+                    ImGui::SameLine();
+                    ImGui::Text("     Source:");
+                    ImGui::SameLine();
                     sel = trigsrcs->selected;
                     if (ImGui::Combo("##trigsrc", &sel, trigsrcs->arr, trigsrcs->narr) && !capturing)
                     {
