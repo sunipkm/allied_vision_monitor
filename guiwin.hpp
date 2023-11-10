@@ -14,11 +14,15 @@
 
 #include "imagetexture.hpp"
 
+#include "imgui_separator.hpp"
+
 #define eprintlf(fmt, ...)                                                                     \
     {                                                                                          \
         fprintf(stderr, "%s:%d:%s(): " fmt "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__); \
         fflush(stderr);                                                                        \
     }
+
+static ImVec4 header_col = ImVec4(168.0/255, 21.0/255, 5.0/255, 1);
 
 class CaptureStat
 {
@@ -128,6 +132,7 @@ public:
     char **arr = nullptr;
     int narr = 0;
     int selected;
+    size_t maxlen = 0;
 
     ~CharContainer()
     {
@@ -156,6 +161,10 @@ public:
         for (int i = 0; i < narr; i++)
         {
             this->arr[i] = strdup(arr[i]);
+            if (strlen(arr[i]) > maxlen)
+            {
+                maxlen = strlen(arr[i]);
+            }
         }
     }
 
@@ -166,6 +175,10 @@ public:
         for (int i = 0; i < narr; i++)
         {
             this->arr[i] = strdup(arr[i]);
+            if (strlen(arr[i]) > maxlen)
+            {
+                maxlen = strlen(arr[i]);
+            }
         }
         this->selected = find_idx(key);
     }
@@ -559,7 +572,9 @@ public:
                         ImGui::SameLine();
                         ImGui::Text("%s: %5.2f C", srcs[i], temps[i]);
                     }
-                    ImGui::Separator();
+                    ImGui::PushStyleColor(ImGuiCol_Text, header_col);
+                    ImGui::TextSeparator((char *)"Image Properties");
+                    ImGui::PopStyleColor();
                 }
                 // get frame rate
                 if (frate_changed)
@@ -576,7 +591,7 @@ public:
                 {
                     ImGui::Text("Pixel Format:");
                     ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 10);
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * (pixfmts->maxlen + 6));
                     int sel = pixfmts->selected;
                     if (ImGui::Combo("##pixfmt", &sel, pixfmts->arr, pixfmts->narr))
                     {
@@ -603,7 +618,7 @@ public:
                     ImGui::SameLine();
                     ImGui::Text("ADC BPP:");
                     ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 12);
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * (adcrates->maxlen + 6));
                     sel = adcrates->selected;
                     if (ImGui::Combo("##adcbpp", &sel, adcrates->arr, adcrates->narr))
                     {
@@ -726,6 +741,9 @@ public:
                     }
                 }
                 // set exposure
+                ImGui::PushStyleColor(ImGuiCol_Text, header_col);
+                ImGui::TextSeparator((char *)"Exposure Properties");
+                ImGui::PopStyleColor();
                 {
                     if (exp_changed)
                     {
@@ -802,6 +820,9 @@ public:
                 // select trigger line and source
                 if (triglines != nullptr && trigsrcs != nullptr)
                 {
+                    ImGui::PushStyleColor(ImGuiCol_Text, header_col);                    
+                    ImGui::TextSeparator((char *)"Camera GPIO");
+                    ImGui::PopStyleColor();
                     if (trigline_changed) // trig line changed, update source selection
                     {
                         int sel = trigsrcs->selected;
@@ -815,7 +836,7 @@ public:
                     }
                     ImGui::Text("Trigger Line:");
                     ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 10);
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * (triglines->maxlen + 6));
                     int sel = triglines->selected;
                     if (ImGui::Combo("##trigline", &sel, triglines->arr, triglines->narr) && !capturing)
                     {
@@ -843,6 +864,7 @@ public:
                     ImGui::Text("     Source:");
                     ImGui::SameLine();
                     sel = trigsrcs->selected;
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * (trigsrcs->maxlen + 6));
                     if (ImGui::Combo("##trigsrc", &sel, trigsrcs->arr, trigsrcs->narr) && !capturing)
                     {
                         err = allied_set_trigline_src(handle, trigsrcs->arr[sel]);
@@ -859,8 +881,9 @@ public:
                             update_err("Could not get trigline src", err);
                         }
                     }
+                    ImGui::PopItemWidth();
 trigline_clear:
-                    assert(true);
+                    ImGui::PopItemWidth();
                 }
                 // Start/stop capture
                 if (!capturing)
@@ -892,7 +915,9 @@ trigline_clear:
                             pressed_stop = false;
                     }
                 }
-                ImGui::Separator();
+                ImGui::PushStyleColor(ImGuiCol_Text, header_col);
+                ImGui::TextSeparator((char *)"Statistics");
+                ImGui::PopStyleColor();
                 // Capture stats display
                 double avg, std;
                 stat.get_stats(avg, std);
@@ -906,7 +931,7 @@ trigline_clear:
                 {
                     errmsg = "";
                 }
-                ImGui::Separator();
+                ImGui::TextSeparator((char *)"Image Display");
                 // Image Display
                 {
                     GLuint texture = 0;

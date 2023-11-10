@@ -44,20 +44,30 @@ all: CFLAGS+= -O2
 GUITARGET=imagegen.out
 
 all: clean $(GUITARGET)
-	$(ECHO) "Built for $(UNAME_S), execute ./$(GUITARGET)"
+	@$(ECHO)
+	@$(ECHO)
+	@$(ECHO) "Built for $(UNAME_S), execute \"LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):alliedcam/lib ./$(GUITARGET)\""
+	@$(ECHO)
+	@$(ECHO)
+	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):alliedcam/lib ./$(GUITARGET)
 
 $(GUITARGET): imgui/libimgui_glfw.a alliedcam/liballiedcam.a rtd_adio/lib/librtd-aDIO.a
 	$(CXX) -o $@ guimain.cpp stringhasher.cpp $(CXXFLAGS) imgui/libimgui_glfw.a alliedcam/liballiedcam.a $(LIBS)
-	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):alliedcam/lib ./$(GUITARGET)
 
 imgui/libimgui_glfw.a:
-	cd $(PWD)/imgui && make -j$(nproc) && cd $(PWD)
+	@$(ECHO) -n "Building imgui..."
+	@cd $(PWD)/imgui && make -j$(nproc) && cd $(PWD)
+	@$(ECHO) "done"
 
 alliedcam/liballiedcam.a:
-	cd $(PWD)/alliedcam && make liballiedcam.a && cd $(PWD)
+	@$(ECHO) -n "Building alliedcam..."
+	@cd $(PWD)/alliedcam && make liballiedcam.a && cd $(PWD)
+	@$(ECHO) "done"
 
 rtd_adio/lib/librtd-aDIO.a:
-	cd $(PWD)/rtd_adio/lib && make && cd $(PWD)
+	@$(ECHO) -n "Building rtd_adio..."
+	@cd $(PWD)/rtd_adio/lib && make && cd $(PWD)
+	@$(ECHO) "done"
 
 %.o: %.c
 	$(CC) $(EDCFLAGS) -o $@ -c $<
@@ -69,8 +79,8 @@ rtd_adio/lib/librtd-aDIO.a:
 
 clean:
 	$(RM) $(GUITARGET)
-	cd $(PWD)/rtd_adio/lib && make clean && cd $(PWD)
-	cd $(PWD)/alliedcam && make clean && cd $(PWD)
+	@cd $(PWD)/rtd_adio/lib && make clean && cd $(PWD)
+	@cd $(PWD)/alliedcam && make clean && cd $(PWD)
 
 spotless: clean
 	cd $(PWD)/imgui && make spotless && cd $(PWD)
