@@ -45,6 +45,7 @@ public:
     std::string errstr = "";
     DeviceHandle adio_dev = nullptr;
     StringHasher *hashgen;
+    bool win_debug_adio = false;
 
     void update_err(int devidx, const char *errmsg)
     {
@@ -288,6 +289,11 @@ public:
             errstr = "";
         }
         ImGui::Separator();
+        if (adio_dev != nullptr)
+        {
+            ImGui::Checkbox("Debug ADIO", &win_debug_adio);
+            ImGui::Separator();
+        }
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
         ImGui::End();
@@ -296,6 +302,31 @@ public:
         {
             auto item = camstructs.at(*it);
             item->display();
+        }
+
+        if (win_debug_adio)
+        {
+            // State
+            static bool vals[8] = {false, false, false, false, false, false, false, false};
+            // Draw ADIO debug window
+            ImGui::Begin("ADIO Debug", &win_debug_adio);
+            ImGui::Text("ADIO Minor Number: %d", adio_dev->minor);
+            ImGui::Separator();
+            uint8_t val;
+            ReadPort_aDIO(adio_dev, 0, &val);
+            ImGui::Text("ADIO Port 0: %01d %01d %01d %01d %01d %01d %01d %01d", (val >> 7) & 1, (val >> 6) & 1, (val >> 5) & 1, (val >> 4) & 1, (val >> 3) & 1, (val >> 2) & 1, (val >> 1) & 1, (val >> 0) & 1);
+            for (int i = 0; i < 8; i++)
+            {
+                std::string label = "Port " + std::to_string(i);
+                if (ImGui::Button(label.c_str()))
+                {
+                    vals[i] = !vals[i];
+                    WriteBit_aDIO(adio_dev, 0, i, vals[i]);
+                }
+                ImGui::SameLine();
+            }
+            ImGui::Text(" ");
+            ImGui::End();
         }
     }
 };

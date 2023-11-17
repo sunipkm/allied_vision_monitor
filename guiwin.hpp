@@ -341,6 +341,7 @@ public:
         this->adio_hdl = adio_hdl;
         title = info.name + " [" + info.serial + "]";
         opened = false;
+        capturing = false;
         // open_camera();
     }
 
@@ -913,6 +914,11 @@ trigline_clear:
                         update_err("Stop capture", err);
                         if (err != VmbErrorSuccess)
                             pressed_stop = false;
+                        if (adio_hdl != nullptr && adio_bit >= 0)
+                        {
+                            this->state = 0;
+                            WriteBit_aDIO(adio_hdl, 0, adio_bit, this->state);
+                        }
                     }
                 }
                 ImGui::PushStyleColor(ImGuiCol_Text, header_col);
@@ -994,7 +1000,7 @@ trigline_clear:
     {
         assert(user_data);
         ImageDisplay *self = (ImageDisplay *)user_data;
-        if (self->adio_hdl != nullptr && self->adio_bit > 0)
+        if (self->adio_hdl != nullptr && self->adio_bit >= 0)
         {
             self->state = ~self->state;
             WriteBit_aDIO(self->adio_hdl, 0, self->adio_bit, self->state);
