@@ -279,6 +279,24 @@ public:
         {
             refresh_list();
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Start Capture All"))
+        {
+            for (auto it = open_cams.begin(); it != open_cams.end(); it++)
+            {
+                auto item = camstructs.at(*it);
+                item->start_capture();
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Stop Capture All"))
+        {
+            for (auto it = open_cams.begin(); it != open_cams.end(); it++)
+            {
+                auto item = camstructs.at(*it);
+                item->stop_capture();
+            }
+        }
         ImGui::Separator();
         if (errstr.length())
         {

@@ -894,11 +894,7 @@ trigline_clear:
                     if (ImGui::Button("Start Capture") && !pressed_start)
                     {
                         pressed_start = true;
-                        stat.reset();
-                        img.collision = 0;
-                        img.stall = 0;
-                        err = allied_start_capture(handle, &Callback, (void *)this); // set the callback here
-                        update_err("Start capture", err);
+                        err = start_capture();
                         if (err != VmbErrorSuccess)
                             pressed_start = false;
                     }
@@ -910,15 +906,9 @@ trigline_clear:
                     if (ImGui::Button("Stop Capture") && !pressed_stop)
                     {
                         pressed_stop = true;
-                        err = allied_stop_capture(handle);
-                        update_err("Stop capture", err);
+                        err = stop_capture();
                         if (err != VmbErrorSuccess)
                             pressed_stop = false;
-                        if (adio_hdl != nullptr && adio_bit >= 0)
-                        {
-                            this->state = 0;
-                            WriteBit_aDIO(adio_hdl, 0, adio_bit, this->state);
-                        }
                     }
                 }
                 ImGui::PushStyleColor(ImGuiCol_Text, header_col);
@@ -989,6 +979,36 @@ trigline_clear:
     bool running()
     {
         return capturing;
+    }
+
+    VmbError_t start_capture()
+    {
+        VmbError_t err = VmbErrorSuccess;
+        if (handle != nullptr && !capturing)
+        {
+            stat.reset();
+            img.collision = 0;
+            img.stall = 0;
+            err = allied_start_capture(handle, &Callback, (void *)this); // set the callback here
+            update_err("Start capture", err);
+        }
+        return err;
+    }
+
+    VmbError_t stop_capture()
+    {
+        VmbError_t err = VmbErrorSuccess;
+        if (handle != nullptr && capturing)
+        {
+            err = allied_stop_capture(handle);
+            update_err("Stop capture", err);
+            if (adio_hdl != nullptr && adio_bit >= 0)
+            {
+                this->state = 0;
+                WriteBit_aDIO(adio_hdl, 0, adio_bit, this->state);
+            }
+        }
+        return err;
     }
 
     ~ImageDisplay()
