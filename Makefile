@@ -69,6 +69,11 @@ rtd_adio/lib/librtd-aDIO.a:
 	@cd $(PWD)/rtd_adio/lib && make && cd $(PWD)
 	@$(ECHO) "done"
 
+load:
+	@$(ECHO) -n "Loading RTD aDIO driver..."
+	@cd $(PWD)/rtd_adio/driver && make && make load && cd $(PWD)
+	@$(ECHO) "done"
+
 %.o: %.c
 	$(CC) $(EDCFLAGS) -o $@ -c $<
 
