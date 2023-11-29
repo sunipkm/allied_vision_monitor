@@ -527,6 +527,7 @@ public:
         static bool frate_auto = true;
         static bool frate_changed = true;
         static bool trigline_changed = true;
+        static int speed = throughput / 1000 / 1000;
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 640), ImVec2(INFINITY, INFINITY));
         const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
@@ -937,9 +938,10 @@ trigline_clear:
                 ImGui::PopStyleColor();
                 // set link speed
                 {
-                    int speed = throughput / 1000 / 1000;
+                    if (speed == 0) // init
+                        speed = throughput / 1000 / 1000;
                     bool update = false;
-                    ImGui::Text("Link Speed:");
+                    ImGui::Text("Link Speed (Current: %3lld MBps):", throughput / 1000 / 1000);
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
                     if (ImGui::InputInt("##speed", &speed, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
@@ -948,7 +950,6 @@ trigline_clear:
                             speed = throughput_min / 1000 / 1000;
                         if (speed > throughput_max / 1000 / 1000)
                             speed = throughput_max / 1000 / 1000;
-                        update = true;
                     }
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
@@ -963,7 +964,7 @@ trigline_clear:
                         if (err == VmbErrorSuccess)
                         {
                             VmbInt64_t _throughput;
-                            err = allied_get_link_speed(handle, &_throughput);
+                            err = allied_get_throughput_limit(handle, &_throughput);
                             update_err("Get link speed", err);
                             if (err == VmbErrorSuccess)
                             {
@@ -971,6 +972,11 @@ trigline_clear:
                             }
                             frate_changed = true;
                         }
+                        else
+                        {
+                            eprintlf("Error setting link speed to %d Bps: %s", speed * 1000 * 1000, allied_strerr(err));
+                        }
+                        speed = throughput / 1000 / 1000;
                     }
                 }
                 ImGui::PushStyleColor(ImGuiCol_Text, header_col);
