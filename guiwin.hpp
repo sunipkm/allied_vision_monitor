@@ -310,6 +310,11 @@ private:
     CharContainer *trigsrcs = nullptr;
     TempSensors *tempsensors = nullptr;
     DeviceHandle adio_hdl = nullptr;
+    VmbInt64_t link_speed = 0;
+    std::string link_speed_str = "";
+    VmbInt64_t throughput = 0;
+    VmbInt64_t throughput_min = 0;
+    VmbInt64_t throughput_max = 0;
     unsigned char state = 0;
     bool capturing;
 
@@ -356,6 +361,22 @@ public:
         char *key = nullptr;
         char **arr = nullptr;
         VmbUint32_t narr = 0;
+        err = allied_get_link_speed(handle, &link_speed);
+        if (err != VmbErrorSuccess)
+        {
+            update_err("Could not get link speed", err);
+        }
+        link_speed_str = string_format("Link Speed Settings (Max: %d MBps)", link_speed / 1000 / 1000);
+        err = allied_get_throughput_limit(handle, &throughput);
+        if (err != VmbErrorSuccess)
+        {
+            update_err("Could not get throughput limit", err);
+        }
+        err = allied_get_throughput_limit_range(handle, &throughput_min, &throughput_max, NULL);
+        if (err != VmbErrorSuccess)
+        {
+            update_err("Could not get throughput limit range", err);
+        }
         err = allied_get_image_format(handle, (const char **)&key);
         if (err == VmbErrorSuccess)
         {
@@ -507,7 +528,7 @@ public:
         static bool frate_changed = true;
         static bool trigline_changed = true;
 
-        ImGui::SetNextWindowSizeConstraints(ImVec2(512, 512), ImVec2(INFINITY, INFINITY));
+        ImGui::SetNextWindowSizeConstraints(ImVec2(512, 640), ImVec2(INFINITY, INFINITY));
         const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
         if (show && ImGui::Begin(title.c_str(), &show))
             ImGui::PushID(title.c_str());
@@ -909,6 +930,47 @@ trigline_clear:
                         err = stop_capture();
                         if (err != VmbErrorSuccess)
                             pressed_stop = false;
+                    }
+                }
+                ImGui::PushStyleColor(ImGuiCol_Text, header_col);
+                ImGui::TextSeparator((char *) link_speed_str.c_str());
+                ImGui::PopStyleColor();
+                // set link speed
+                {
+                    int speed = throughput / 1000 / 1000;
+                    bool update = false;
+                    ImGui::Text("Link Speed:");
+                    ImGui::SameLine();
+                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
+                    if (ImGui::InputInt("##speed", &speed, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
+                    {
+                        if (speed < throughput_min / 1000 / 1000)
+                            speed = throughput_min / 1000 / 1000;
+                        if (speed > throughput_max / 1000 / 1000)
+                            speed = throughput_max / 1000 / 1000;
+                        update = true;
+                    }
+                    ImGui::PopItemWidth();
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Update##Speed") && !capturing)
+                    {
+                        update = true;
+                    }
+                    if (update)
+                    {
+                        err = allied_set_throughput_limit(handle, speed * 1000 * 1000);
+                        update_err("Set link speed", err);
+                        if (err == VmbErrorSuccess)
+                        {
+                            VmbInt64_t _throughput;
+                            err = allied_get_link_speed(handle, &_throughput);
+                            update_err("Get link speed", err);
+                            if (err == VmbErrorSuccess)
+                            {
+                                throughput = _throughput;
+                            }
+                            frate_changed = true;
+                        }
                     }
                 }
                 ImGui::PushStyleColor(ImGuiCol_Text, header_col);
