@@ -119,6 +119,10 @@ public:
         for (auto cam = cameras.begin(); cam != cameras.end(); cam++)
         {
             uint32_t val = hashgen->get_hash(std::string(cam->cameraIdString));
+            if (ids.find(val) != ids.end()) // already in there
+            {
+                continue;
+            }
             ids.insert(val);
             CameraInfo cf(*cam);
             caminfos[val] = cf;
@@ -253,9 +257,10 @@ public:
                         eprintlf("ADIO Sel: %d -> %d", oldsel, sel);
                     }
                 }
-                // button
+                // buttons
                 if (ImGui::TableSetColumnIndex(4))
                 {
+                    ImGui::PushID(row_id);
                     if (ImGui::SmallButton("Open"))
                     {
                         win->show = true;
@@ -266,6 +271,7 @@ public:
                     {
                         printf("Idx: %d | ID: %s\n", row_id, info.idstr.c_str());
                     }
+                    ImGui::PopID();
                 }
             }
             ImGui::PopButtonRepeat();

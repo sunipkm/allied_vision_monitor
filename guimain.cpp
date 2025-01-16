@@ -99,19 +99,15 @@ int main(int argc, char *argv[])
     }
 done_allied:
     // setup allied camera API
-    if (cti_path == "")
+    const char *cti_path_cstr = NULL;
+    if (cti_path != "")
     {
-        if (allied_init_api(NULL) != VmbErrorSuccess)
-        {
-            printf("Could not initialize the Allied Camera API. Check if .cti files are in path.\n");
-            exit(EXIT_FAILURE);
-        }
-    } else {
-        if (allied_init_api(cti_path.c_str()) != VmbErrorSuccess)
-        {
-            printf("Could not initialize the Allied Camera API. Check if .cti files are in path.\n");
-            exit(EXIT_FAILURE);
-        }
+        cti_path_cstr = cti_path.c_str();
+    }
+    if (allied_init_api(cti_path_cstr) != VmbErrorSuccess)
+    {
+        printf("Could not initialize the Allied Camera API. Check if .cti files are in path.\n");
+        exit(EXIT_FAILURE);
     } 
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
