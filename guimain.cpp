@@ -37,9 +37,10 @@ int main(int argc, char *argv[])
     std::string camera_id = "";
     int adio_minor_num = 0;
     bool adio_init = true;
+    std::string cti_path = "";
     // process args
     int c;
-    while ((c = getopt(argc, argv, "c:a:h")) != -1)
+    while ((c = getopt(argc, argv, "c:a:h:p:")) != -1)
     {
         switch (c)
         {
@@ -55,10 +56,16 @@ int main(int argc, char *argv[])
                 adio_minor_num = atoi(optarg);
                 break;
             }
+            case 'p':
+            {
+                printf("CTI path: %s\n", optarg);
+                cti_path = optarg;
+                break;
+            }
             case 'h':
             default:
             {
-                printf("\nUsage: %s [-c camera_id] [-a adio_minor_num] [-h Show this message]\n\n", argv[0]);
+                printf("\nUsage: %s [-c camera_id] [-a adio_minor_num] [-p /path/to/cti/files] [-h Show this message]\n\n", argv[0]);
                 exit(EXIT_SUCCESS);
             }
         }
@@ -92,11 +99,20 @@ int main(int argc, char *argv[])
     }
 done_allied:
     // setup allied camera API
-    if (allied_init_api(NULL) != VmbErrorSuccess)
+    if (cti_path == "")
     {
-        printf("Could not initialize the Allied Camera API. Check if .cti files are in path.\n");
-        exit(EXIT_FAILURE);
-    }
+        if (allied_init_api(NULL) != VmbErrorSuccess)
+        {
+            printf("Could not initialize the Allied Camera API. Check if .cti files are in path.\n");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        if (allied_init_api(cti_path.c_str()) != VmbErrorSuccess)
+        {
+            printf("Could not initialize the Allied Camera API. Check if .cti files are in path.\n");
+            exit(EXIT_FAILURE);
+        }
+    } 
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())

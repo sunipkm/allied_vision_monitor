@@ -22,7 +22,7 @@
         fflush(stderr);                                                                        \
     }
 
-static ImVec4 header_col = ImVec4(168.0/255, 21.0/255, 5.0/255, 1);
+static ImVec4 header_col = ImVec4(168.0 / 255, 21.0 / 255, 5.0 / 255, 1);
 
 class CaptureStat
 {
@@ -595,318 +595,327 @@ public:
                         ImGui::SameLine();
                         ImGui::Text("%s: %5.2f C", srcs[i], temps[i]);
                     }
-                    ImGui::PushStyleColor(ImGuiCol_Text, header_col);
-                    ImGui::TextSeparator((char *)"Image Properties");
-                    ImGui::PopStyleColor();
                 }
-                // get frame rate
-                if (frate_changed)
+                // {
+                //     ImGui::PushStyleColor(ImGuiCol_Text, header_col);
+                //     ImGui::TextSeparator((char *)"Image Properties");
+                //     ImGui::PopStyleColor();
+                // }
+                if (ImGui::CollapsingHeader("Image Properties"))
                 {
-                    double dummy;
-                    err = allied_get_acq_framerate(handle, &frate);
-                    update_err("Get framerate", err);
-                    err = allied_get_acq_framerate_range(handle, &frate_min, &frate_max, &dummy);
-                    update_err("Get framerate range", err);
-                    frate_changed = false;
-                }
-                // Select pixel format and ADC bpp
-                if (pixfmts != nullptr && adcrates != nullptr)
-                {
-                    ImGui::Text("Pixel Format:");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * (pixfmts->maxlen + 6));
-                    int sel = pixfmts->selected;
-                    if (ImGui::Combo("##pixfmt", &sel, pixfmts->arr, pixfmts->narr))
+                    // get frame rate
+                    if (frate_changed)
                     {
-                        if (!capturing)
-                        {
-                            // pixfmts->selected = sel;
-                            err = allied_set_image_format(handle, pixfmts->arr[sel]);
-                            update_err("Set image format", err);
-                            char *key = nullptr;
-                            err = allied_get_image_format(handle, (const char **)&key);
-                            if (err == VmbErrorSuccess && key != nullptr && (sel = pixfmts->find_idx(key)) != -1)
-                            {
-                                // all good
-                                pixfmts->selected = sel;
-                                frate_changed = true;
-                            }
-                            else
-                            {
-                                update_err("Could not get image format", err);
-                            }
-                        } // don't change if capturing
+                        double dummy;
+                        err = allied_get_acq_framerate(handle, &frate);
+                        update_err("Get framerate", err);
+                        err = allied_get_acq_framerate_range(handle, &frate_min, &frate_max, &dummy);
+                        update_err("Get framerate range", err);
+                        frate_changed = false;
                     }
-                    ImGui::PopItemWidth();
-                    ImGui::SameLine();
-                    ImGui::Text("ADC BPP:");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * (adcrates->maxlen + 6));
-                    sel = adcrates->selected;
-                    if (ImGui::Combo("##adcbpp", &sel, adcrates->arr, adcrates->narr))
+                    // Select pixel format and ADC bpp
+                    if (pixfmts != nullptr && adcrates != nullptr)
                     {
-                        if (!capturing)
+                        ImGui::Text("Pixel Format:");
+                        ImGui::SameLine();
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * (pixfmts->maxlen + 6));
+                        int sel = pixfmts->selected;
+                        if (ImGui::Combo("##pixfmt", &sel, pixfmts->arr, pixfmts->narr))
                         {
-                            err = allied_set_sensor_bit_depth(handle, adcrates->arr[sel]);
-                            update_err("Set sensor bit depth", err);
-                            char *key = nullptr;
-                            err = allied_get_sensor_bit_depth(handle, (const char **)&key);
-                            if (err == VmbErrorSuccess && key != nullptr && (sel = adcrates->find_idx(key)) != -1)
+                            if (!capturing)
                             {
-                                // all good
-                                adcrates->selected = sel;
-                                frate_changed = true;
+                                // pixfmts->selected = sel;
+                                err = allied_set_image_format(handle, pixfmts->arr[sel]);
+                                update_err("Set image format", err);
+                                char *key = nullptr;
+                                err = allied_get_image_format(handle, (const char **)&key);
+                                if (err == VmbErrorSuccess && key != nullptr && (sel = pixfmts->find_idx(key)) != -1)
+                                {
+                                    // all good
+                                    pixfmts->selected = sel;
+                                    frate_changed = true;
+                                }
+                                else
+                                {
+                                    update_err("Could not get image format", err);
+                                }
+                            } // don't change if capturing
+                        }
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        ImGui::Text("ADC BPP:");
+                        ImGui::SameLine();
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * (adcrates->maxlen + 6));
+                        sel = adcrates->selected;
+                        if (ImGui::Combo("##adcbpp", &sel, adcrates->arr, adcrates->narr))
+                        {
+                            if (!capturing)
+                            {
+                                err = allied_set_sensor_bit_depth(handle, adcrates->arr[sel]);
+                                update_err("Set sensor bit depth", err);
+                                char *key = nullptr;
+                                err = allied_get_sensor_bit_depth(handle, (const char **)&key);
+                                if (err == VmbErrorSuccess && key != nullptr && (sel = adcrates->find_idx(key)) != -1)
+                                {
+                                    // all good
+                                    adcrates->selected = sel;
+                                    frate_changed = true;
+                                }
+                                else
+                                {
+                                    update_err("Could not get sensor bit depth", err);
+                                }
                             }
-                            else
+                        }
+                        ImGui::PopItemWidth();
+                    }
+                    // set binning
+                    {
+                        if (bin_changed)
+                        {
+                            VmbInt64_t bin;
+                            err = allied_get_binning_factor(handle, &bin);
+                            update_err("Binning changed", err);
+                            sbin = bin;
+                            bin_changed = false;
+                        }
+                        ImGui::Text("Image Bin:");
+                        ImGui::SameLine();
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
+                        if (ImGui::InputInt("##bin", &sbin, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
+                        {
+                            if (sbin < 1)
+                                sbin = 1;
+                        }
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Update##Bin") && !capturing)
+                        {
+                            bin_changed = true;
+                            size_changed = true;
+                            ofst_changed = true;
+                            err = allied_set_binning_factor(handle, sbin);
+                            if (err != VmbErrorSuccess)
                             {
-                                update_err("Could not get sensor bit depth", err);
+                                errmsg = string_format("Could not set binning to %d: ", sbin) + std::string(allied_strerr(err));
                             }
                         }
                     }
-                    ImGui::PopItemWidth();
-                }
-                // set binning
-                {
-                    if (bin_changed)
+                    // set width + height
                     {
-                        VmbInt64_t bin;
-                        err = allied_get_binning_factor(handle, &bin);
-                        update_err("Binning changed", err);
-                        sbin = bin;
-                        bin_changed = false;
-                    }
-                    ImGui::Text("Image Bin:");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    if (ImGui::InputInt("##bin", &sbin, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
-                    {
-                        if (sbin < 1)
-                            sbin = 1;
-                    }
-                    ImGui::PopItemWidth();
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Update##Bin") && !capturing)
-                    {
-                        bin_changed = true;
-                        size_changed = true;
-                        ofst_changed = true;
-                        err = allied_set_binning_factor(handle, sbin);
-                        if (err != VmbErrorSuccess)
+                        if (size_changed)
                         {
-                            errmsg = string_format("Could not set binning to %d: ", sbin) + std::string(allied_strerr(err));
+                            VmbInt64_t width, height;
+                            err = allied_get_image_size(handle, &width, &height);
+                            update_err("Size changed", err);
+                            frate_changed = true;
+                            swid = width;
+                            shgt = height;
+                            size_changed = false;
+                        }
+                        ImGui::Text("Image Size:");
+                        ImGui::SameLine();
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
+                        ImGui::InputInt("##width", &swid, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        ImGui::Text(" x ");
+                        ImGui::SameLine();
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
+                        ImGui::InputInt("##height", &shgt, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton(("Update##Size" + info.idstr).c_str()) && !capturing)
+                        {
+                            size_changed = true;
+                            err = allied_set_image_size(handle, swid, shgt);
+                            if (err != VmbErrorSuccess)
+                            {
+                                errmsg = string_format("Could not set image size to %u x %u: ", swid, shgt) + std::string(allied_strerr(err));
+                            }
+                        }
+                    }
+                    // set offset
+                    {
+                        if (ofst_changed)
+                        {
+                            VmbInt64_t width, height;
+                            err = allied_get_image_ofst(handle, &width, &height);
+                            ofx = width;
+                            ofy = height;
+                            ofst_changed = false;
+                        }
+                        ImGui::Text("Image Offset:");
+                        ImGui::SameLine();
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
+                        ImGui::InputInt(("##ofstx" + info.idstr).c_str(), &ofx, 0, 0, 0);
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        ImGui::Text(" x ");
+                        ImGui::SameLine();
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
+                        ImGui::InputInt(("##ofsty" + info.idstr).c_str(), &ofy, 0, 0, 0);
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Update##Ofst"))
+                        {
+                            ofst_changed = true;
+                            err = allied_set_image_ofst(handle, ofx, ofy);
+                            if (err != VmbErrorSuccess)
+                            {
+                                errmsg = "Could not set image offset: " + std::string(allied_strerr(err));
+                            }
                         }
                     }
                 }
-                // set width + height
-                {
-                    if (size_changed)
-                    {
-                        VmbInt64_t width, height;
-                        err = allied_get_image_size(handle, &width, &height);
-                        update_err("Size changed", err);
-                        frate_changed = true;
-                        swid = width;
-                        shgt = height;
-                        size_changed = false;
-                    }
-                    ImGui::Text("Image Size:");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    ImGui::InputInt("##width", &swid, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
-                    ImGui::PopItemWidth();
-                    ImGui::SameLine();
-                    ImGui::Text(" x ");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    ImGui::InputInt("##height", &shgt, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
-                    ImGui::PopItemWidth();
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton(("Update##Size" + info.idstr).c_str()) && !capturing)
-                    {
-                        size_changed = true;
-                        err = allied_set_image_size(handle, swid, shgt);
-                        if (err != VmbErrorSuccess)
-                        {
-                            errmsg = string_format("Could not set image size to %u x %u: ", swid, shgt) + std::string(allied_strerr(err));
-                        }
-                    }
-                }
-                // set offset
-                {
-                    if (ofst_changed)
-                    {
-                        VmbInt64_t width, height;
-                        err = allied_get_image_ofst(handle, &width, &height);
-                        ofx = width;
-                        ofy = height;
-                        ofst_changed = false;
-                    }
-                    ImGui::Text("Image Offset:");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    ImGui::InputInt(("##ofstx" + info.idstr).c_str(), &ofx, 0, 0, 0);
-                    ImGui::PopItemWidth();
-                    ImGui::SameLine();
-                    ImGui::Text(" x ");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    ImGui::InputInt(("##ofsty" + info.idstr).c_str(), &ofy, 0, 0, 0);
-                    ImGui::PopItemWidth();
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Update##Ofst"))
-                    {
-                        ofst_changed = true;
-                        err = allied_set_image_ofst(handle, ofx, ofy);
-                        if (err != VmbErrorSuccess)
-                        {
-                            errmsg = "Could not set image offset: " + std::string(allied_strerr(err));
-                        }
-                    }
-                }
+
                 // set exposure
-                ImGui::PushStyleColor(ImGuiCol_Text, header_col);
-                ImGui::TextSeparator((char *)"Exposure Properties");
-                ImGui::PopStyleColor();
+                // ImGui::PushStyleColor(ImGuiCol_Text, header_col);
+                // ImGui::TextSeparator((char *)"Exposure Properties");
+                // ImGui::PopStyleColor();
+                if (ImGui::CollapsingHeader("Exposure Properties"))
                 {
-                    if (exp_changed)
                     {
-                        err = allied_get_exposure_range_us(handle, &expmin, &expmax, &expstep);
-                        update_err("Get exposure range", err);
-                        err = allied_get_exposure_us(handle, &currexp);
-                        update_err("Get exposure", err);
-                        frate_changed = true;
-                        exp_changed = false;
-                    }
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
-                    if (ImGui::InputDouble("Exposure (us)", &currexp, expstep, ImGuiInputTextFlags_EnterReturnsTrue))
-                    {
-                        if (currexp < expmin)
-                            currexp = expmin;
-                        if (currexp > expmax)
-                            currexp = expmax;
-                    }
-                    ImGui::PopItemWidth();
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Update##Exposure"))
-                    {
-                        if (currexp < expmin)
-                            currexp = expmin;
-                        if (currexp > expmax)
-                            currexp = expmax;
-                        err = allied_set_exposure_us(handle, currexp);
-                        update_err("Update exposure", err);
-                        exp_changed = true;
-                        stat.reset();
-                    }
-                }
-                // set framerate
-                {
-                    bool old_frate_auto = frate_auto;
-                    if (ImGui::Checkbox("Auto Frame Rate", &frate_auto))
-                    {
-                        err = allied_set_acq_framerate_auto(handle, frate_auto);
-                        if (err != VmbErrorSuccess)
+                        if (exp_changed)
                         {
-                            frate_auto = old_frate_auto;
+                            err = allied_get_exposure_range_us(handle, &expmin, &expmax, &expstep);
+                            update_err("Get exposure range", err);
+                            err = allied_get_exposure_us(handle, &currexp);
+                            update_err("Get exposure", err);
+                            frate_changed = true;
+                            exp_changed = false;
                         }
-                        update_err("Auto frame rate set", err);
-                        err = allied_get_acq_framerate_auto(handle, &frate_auto);
-                        if (err != VmbErrorSuccess)
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
+                        if (ImGui::InputDouble("Exposure (us)", &currexp, expstep, ImGuiInputTextFlags_EnterReturnsTrue))
                         {
-                            frate_auto = old_frate_auto;
+                            if (currexp < expmin)
+                                currexp = expmin;
+                            if (currexp > expmax)
+                                currexp = expmax;
                         }
-                        update_err("Auto frame rate get", err);
-                        frate_changed = true;
-                    }
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
-                    if (ImGui::InputDouble("Frame Rate (Hz)", &frate, 0, 0, "%.4f", frate_auto ? ImGuiInputTextFlags_ReadOnly : ImGuiInputTextFlags_EnterReturnsTrue))
-                    {
-                        if (frate < frate_min)
-                            frate = frate_min;
-                        if (frate > frate_max)
-                            frate = frate_max;
-                    }
-                    ImGui::PopItemWidth();
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Update##FrameRate") && !frate_auto)
-                    {
-                        if (frate < frate_min)
-                            frate = frate_min;
-                        if (frate > frate_max)
-                            frate = frate_max;
-                        err = allied_set_acq_framerate(handle, frate);
-                        update_err("Set frame rate", err);
-                        frate_changed = true;
-                        stat.reset();
-                    }
-                }
-                // select trigger line and source
-                if (triglines != nullptr && trigsrcs != nullptr)
-                {
-                    ImGui::PushStyleColor(ImGuiCol_Text, header_col);                    
-                    ImGui::TextSeparator((char *)"Camera GPIO");
-                    ImGui::PopStyleColor();
-                    if (trigline_changed) // trig line changed, update source selection
-                    {
-                        int sel = trigsrcs->selected;
-                        const char *key;
-                        err = allied_get_trigline_src(handle, &key);
-                        update_err("Could not get trigline source", err);
-                        sel = trigsrcs->find_idx(key);
-                        if (sel >= 0)
-                            trigsrcs->selected = sel;
-                        trigline_changed = false;
-                    }
-                    ImGui::Text("Trigger Line:");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * (triglines->maxlen + 6));
-                    int sel = triglines->selected;
-                    if (ImGui::Combo("##trigline", &sel, triglines->arr, triglines->narr) && !capturing)
-                    {
-                        err = allied_set_trigline(handle, triglines->arr[sel]);
-                        update_err("Select trigger line", err);
-                        if (err != VmbErrorSuccess)
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Update##Exposure"))
                         {
-                            goto trigline_clear;
-                        }
-                        const char *key = nullptr;
-                        err = allied_get_trigline(handle, &key);
-                        if (err == VmbErrorSuccess && key != nullptr && (sel = triglines->find_idx(key)) != -1)
-                        {
-                            // all good
-                            triglines->selected = sel;
-                            trigline_changed = true;
-                            goto trigline_clear;
-                        }
-                        else
-                        {
-                            update_err("Could not get trigger line", err);
+                            if (currexp < expmin)
+                                currexp = expmin;
+                            if (currexp > expmax)
+                                currexp = expmax;
+                            err = allied_set_exposure_us(handle, currexp);
+                            update_err("Update exposure", err);
+                            exp_changed = true;
+                            stat.reset();
                         }
                     }
-                    ImGui::SameLine();
-                    ImGui::Text("     Source:");
-                    ImGui::SameLine();
-                    sel = trigsrcs->selected;
-                    ImGui::PushItemWidth(TEXT_BASE_WIDTH * (trigsrcs->maxlen + 6));
-                    if (ImGui::Combo("##trigsrc", &sel, trigsrcs->arr, trigsrcs->narr) && !capturing)
+                    // set framerate
                     {
-                        err = allied_set_trigline_src(handle, trigsrcs->arr[sel]);
-                        update_err("Select trigger src", err);
-                        const char *key = nullptr;
-                        err = allied_get_trigline_src(handle, &key);
-                        if (err == VmbErrorSuccess && key != nullptr && (sel = trigsrcs->find_idx(key)) != -1)
+                        bool old_frate_auto = frate_auto;
+                        if (ImGui::Checkbox("Auto Frame Rate", &frate_auto))
                         {
-                            // all good
-                            trigsrcs->selected = sel;
+                            err = allied_set_acq_framerate_auto(handle, frate_auto);
+                            if (err != VmbErrorSuccess)
+                            {
+                                frate_auto = old_frate_auto;
+                            }
+                            update_err("Auto frame rate set", err);
+                            err = allied_get_acq_framerate_auto(handle, &frate_auto);
+                            if (err != VmbErrorSuccess)
+                            {
+                                frate_auto = old_frate_auto;
+                            }
+                            update_err("Auto frame rate get", err);
+                            frate_changed = true;
                         }
-                        else
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
+                        if (ImGui::InputDouble("Frame Rate (Hz)", &frate, 0, 0, "%.4f", frate_auto ? ImGuiInputTextFlags_ReadOnly : ImGuiInputTextFlags_EnterReturnsTrue))
                         {
-                            update_err("Could not get trigline src", err);
+                            if (frate < frate_min)
+                                frate = frate_min;
+                            if (frate > frate_max)
+                                frate = frate_max;
+                        }
+                        ImGui::PopItemWidth();
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Update##FrameRate") && !frate_auto)
+                        {
+                            if (frate < frate_min)
+                                frate = frate_min;
+                            if (frate > frate_max)
+                                frate = frate_max;
+                            err = allied_set_acq_framerate(handle, frate);
+                            update_err("Set frame rate", err);
+                            frate_changed = true;
+                            stat.reset();
                         }
                     }
-                    ImGui::PopItemWidth();
-trigline_clear:
-                    ImGui::PopItemWidth();
+                    // select trigger line and source
+                    if (triglines != nullptr && trigsrcs != nullptr)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, header_col);
+                        ImGui::TextSeparator((char *)"Camera GPIO");
+                        ImGui::PopStyleColor();
+                        if (trigline_changed) // trig line changed, update source selection
+                        {
+                            int sel = trigsrcs->selected;
+                            const char *key;
+                            err = allied_get_trigline_src(handle, &key);
+                            update_err("Could not get trigline source", err);
+                            sel = trigsrcs->find_idx(key);
+                            if (sel >= 0)
+                                trigsrcs->selected = sel;
+                            trigline_changed = false;
+                        }
+                        ImGui::Text("Trigger Line:");
+                        ImGui::SameLine();
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * (triglines->maxlen + 6));
+                        int sel = triglines->selected;
+                        if (ImGui::Combo("##trigline", &sel, triglines->arr, triglines->narr) && !capturing)
+                        {
+                            err = allied_set_trigline(handle, triglines->arr[sel]);
+                            update_err("Select trigger line", err);
+                            if (err != VmbErrorSuccess)
+                            {
+                                goto trigline_clear;
+                            }
+                            const char *key = nullptr;
+                            err = allied_get_trigline(handle, &key);
+                            if (err == VmbErrorSuccess && key != nullptr && (sel = triglines->find_idx(key)) != -1)
+                            {
+                                // all good
+                                triglines->selected = sel;
+                                trigline_changed = true;
+                                goto trigline_clear;
+                            }
+                            else
+                            {
+                                update_err("Could not get trigger line", err);
+                            }
+                        }
+                        ImGui::SameLine();
+                        ImGui::Text("     Source:");
+                        ImGui::SameLine();
+                        sel = trigsrcs->selected;
+                        ImGui::PushItemWidth(TEXT_BASE_WIDTH * (trigsrcs->maxlen + 6));
+                        if (ImGui::Combo("##trigsrc", &sel, trigsrcs->arr, trigsrcs->narr) && !capturing)
+                        {
+                            err = allied_set_trigline_src(handle, trigsrcs->arr[sel]);
+                            update_err("Select trigger src", err);
+                            const char *key = nullptr;
+                            err = allied_get_trigline_src(handle, &key);
+                            if (err == VmbErrorSuccess && key != nullptr && (sel = trigsrcs->find_idx(key)) != -1)
+                            {
+                                // all good
+                                trigsrcs->selected = sel;
+                            }
+                            else
+                            {
+                                update_err("Could not get trigline src", err);
+                            }
+                        }
+                        ImGui::PopItemWidth();
+                    trigline_clear:
+                        ImGui::PopItemWidth();
+                    }
                 }
                 // Start/stop capture
                 if (!capturing)
@@ -934,7 +943,7 @@ trigline_clear:
                     }
                 }
                 ImGui::PushStyleColor(ImGuiCol_Text, header_col);
-                ImGui::TextSeparator((char *) link_speed_str.c_str());
+                ImGui::TextSeparator((char *)link_speed_str.c_str());
                 ImGui::PopStyleColor();
                 // set link speed
                 {
