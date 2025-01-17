@@ -350,9 +350,9 @@ public:
         // open_camera();
     }
 
-    void open_camera()
+    void open_camera(uint32_t bufsize = MIB(16))
     {
-        VmbError_t err = allied_open_camera(&handle, info.idstr.c_str(), 5);
+        VmbError_t err = allied_open_camera(&handle, info.idstr.c_str(), bufsize);
         if (err != VmbErrorSuccess)
         {
             errmsg = "Could not open camera: " + std::string(allied_strerr(err));
@@ -470,7 +470,8 @@ public:
                 }
             }
         }
-
+        err = allied_queue_capture(handle, &Callback, (void *)this);
+        update_err("Could not queue capture", err);
         tempsensors = new TempSensors(handle);
         opened = true;
         // std::cout << "Opened!" << std::endl;
@@ -532,8 +533,8 @@ public:
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 640), ImVec2(INFINITY, INFINITY));
         const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
         if (show && ImGui::Begin(title.c_str(), &show))
-            ImGui::PushID(title.c_str());
         {
+            ImGui::PushID(title.c_str());
             if (!opened)
             {
                 if (ImGui::Button("Open Camera"))
@@ -545,7 +546,7 @@ public:
             else
             {
                 VmbError_t err;
-                capturing = allied_camera_acquiring(handle) || allied_camera_streaming(handle);
+                capturing = allied_camera_acquiring(handle);
                 if (ImGui::Button("Close Camera"))
                 {
                     close_camera();
@@ -1066,7 +1067,7 @@ public:
             stat.reset();
             img.collision = 0;
             img.stall = 0;
-            err = allied_start_capture(handle, &Callback, (void *)this); // set the callback here
+            err = allied_start_capture(handle); // set the callback here
             update_err("Start capture", err);
         }
         return err;
