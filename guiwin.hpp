@@ -529,12 +529,32 @@ public:
         static bool frate_changed = true;
         static bool trigline_changed = true;
         static int speed = throughput / 1000 / 1000;
+        static std::string window_id = string_format("%016x", (uint64_t)handle);
+        static std::string pixfmt_id = string_format("##pixfmt_%s", window_id.c_str());
+        static std::string adcbpp_id = string_format("##adcbpp_%s", window_id.c_str());
+        static std::string bin_id = string_format("##bin_%s", window_id.c_str());
+        static std::string update_bin_id = string_format("Update##bin_%s", window_id.c_str());
+        static std::string width_id = string_format("##width_%s", window_id.c_str());
+        static std::string height_id = string_format("##height_%s", window_id.c_str());
+        static std::string update_size_id = string_format("Update##size_%s", window_id.c_str());
+        static std::string ofstx_id = string_format("##ofstx_%s", window_id.c_str());
+        static std::string ofsty_id = string_format("##ofsty_%s", window_id.c_str());
+        static std::string update_ofst_id = string_format("Update##ofst_%s", window_id.c_str());
+        static std::string exp_id = string_format("Exposure (us)##exp_%s", window_id.c_str());
+        static std::string update_exp_id = string_format("Update##exp_%s", window_id.c_str());
+        static std::string frate_id = string_format("Framerate (Hz)##frate_%s", window_id.c_str());
+        static std::string update_frate_id = string_format("Update##frate_%s", window_id.c_str());
+        static std::string trigline_id = string_format("##trigline_%s", window_id.c_str());
+        static std::string trigsrc_id = string_format("##trigsrc_%s", window_id.c_str());
+        static std::string speed_id = string_format("##speed_%s", window_id.c_str());
+        static std::string update_speed_id = string_format("Update##speed_%s", window_id.c_str());
+
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(512, 640), ImVec2(INFINITY, INFINITY));
         const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
         if (show && ImGui::Begin(title.c_str(), &show))
         {
-            ImGui::PushID(title.c_str());
+            ImGui::PushID(window_id.c_str());
             if (!opened)
             {
                 if (ImGui::Button("Open Camera"))
@@ -621,7 +641,7 @@ public:
                         ImGui::SameLine();
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * (pixfmts->maxlen + 6));
                         int sel = pixfmts->selected;
-                        if (ImGui::Combo("##pixfmt", &sel, pixfmts->arr, pixfmts->narr))
+                        if (ImGui::Combo(pixfmt_id.c_str(), &sel, pixfmts->arr, pixfmts->narr))
                         {
                             if (!capturing)
                             {
@@ -648,7 +668,7 @@ public:
                         ImGui::SameLine();
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * (adcrates->maxlen + 6));
                         sel = adcrates->selected;
-                        if (ImGui::Combo("##adcbpp", &sel, adcrates->arr, adcrates->narr))
+                        if (ImGui::Combo(adcbpp_id.c_str(), &sel, adcrates->arr, adcrates->narr))
                         {
                             if (!capturing)
                             {
@@ -683,14 +703,14 @@ public:
                         ImGui::Text("Image Bin:");
                         ImGui::SameLine();
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                        if (ImGui::InputInt("##bin", &sbin, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
+                        if (ImGui::InputInt(bin_id.c_str(), &sbin, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
                         {
                             if (sbin < 1)
                                 sbin = 1;
                         }
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
-                        if (ImGui::SmallButton("Update##Bin") && !capturing)
+                        if (ImGui::SmallButton(update_bin_id.c_str()) && !capturing)
                         {
                             bin_changed = true;
                             size_changed = true;
@@ -717,16 +737,16 @@ public:
                         ImGui::Text("Image Size:");
                         ImGui::SameLine();
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                        ImGui::InputInt("##width", &swid, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
+                        ImGui::InputInt(width_id.c_str(), &swid, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
                         ImGui::Text(" x ");
                         ImGui::SameLine();
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                        ImGui::InputInt("##height", &shgt, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
+                        ImGui::InputInt(height_id.c_str(), &shgt, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0);
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
-                        if (ImGui::SmallButton(("Update##Size" + info.idstr).c_str()) && !capturing)
+                        if (ImGui::SmallButton((update_size_id.c_str() + info.idstr).c_str()) && !capturing)
                         {
                             size_changed = true;
                             err = allied_set_image_size(handle, swid, shgt);
@@ -749,16 +769,16 @@ public:
                         ImGui::Text("Image Offset:");
                         ImGui::SameLine();
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                        ImGui::InputInt(("##ofstx" + info.idstr).c_str(), &ofx, 0, 0, 0);
+                        ImGui::InputInt((ofstx_id.c_str() + info.idstr).c_str(), &ofx, 0, 0, 0);
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
                         ImGui::Text(" x ");
                         ImGui::SameLine();
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                        ImGui::InputInt(("##ofsty" + info.idstr).c_str(), &ofy, 0, 0, 0);
+                        ImGui::InputInt((ofsty_id.c_str() + info.idstr).c_str(), &ofy, 0, 0, 0);
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
-                        if (ImGui::SmallButton("Update##Ofst"))
+                        if (ImGui::SmallButton(update_ofst_id.c_str()))
                         {
                             ofst_changed = true;
                             err = allied_set_image_ofst(handle, ofx, ofy);
@@ -787,7 +807,7 @@ public:
                             exp_changed = false;
                         }
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
-                        if (ImGui::InputDouble("Exposure (us)", &currexp, expstep, ImGuiInputTextFlags_EnterReturnsTrue))
+                        if (ImGui::InputDouble(exp_id.c_str(), &currexp, expstep, ImGuiInputTextFlags_EnterReturnsTrue))
                         {
                             if (currexp < expmin)
                                 currexp = expmin;
@@ -796,7 +816,7 @@ public:
                         }
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
-                        if (ImGui::SmallButton("Update##Exposure"))
+                        if (ImGui::SmallButton(update_exp_id.c_str()))
                         {
                             if (currexp < expmin)
                                 currexp = expmin;
@@ -828,7 +848,7 @@ public:
                             frate_changed = true;
                         }
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * 25);
-                        if (ImGui::InputDouble("Frame Rate (Hz)", &frate, 0, 0, "%.4f", frate_auto ? ImGuiInputTextFlags_ReadOnly : ImGuiInputTextFlags_EnterReturnsTrue))
+                        if (ImGui::InputDouble(frate_id.c_str(), &frate, 0, 0, "%.4f", frate_auto ? ImGuiInputTextFlags_ReadOnly : ImGuiInputTextFlags_EnterReturnsTrue))
                         {
                             if (frate < frate_min)
                                 frate = frate_min;
@@ -837,7 +857,7 @@ public:
                         }
                         ImGui::PopItemWidth();
                         ImGui::SameLine();
-                        if (ImGui::SmallButton("Update##FrameRate") && !frate_auto)
+                        if (ImGui::SmallButton(update_frate_id.c_str()) && !frate_auto)
                         {
                             if (frate < frate_min)
                                 frate = frate_min;
@@ -870,7 +890,7 @@ public:
                         ImGui::SameLine();
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * (triglines->maxlen + 6));
                         int sel = triglines->selected;
-                        if (ImGui::Combo("##trigline", &sel, triglines->arr, triglines->narr) && !capturing)
+                        if (ImGui::Combo(trigline_id.c_str(), &sel, triglines->arr, triglines->narr) && !capturing)
                         {
                             err = allied_set_trigline(handle, triglines->arr[sel]);
                             update_err("Select trigger line", err);
@@ -897,7 +917,7 @@ public:
                         ImGui::SameLine();
                         sel = trigsrcs->selected;
                         ImGui::PushItemWidth(TEXT_BASE_WIDTH * (trigsrcs->maxlen + 6));
-                        if (ImGui::Combo("##trigsrc", &sel, trigsrcs->arr, trigsrcs->narr) && !capturing)
+                        if (ImGui::Combo(trigsrc_id.c_str(), &sel, trigsrcs->arr, trigsrcs->narr) && !capturing)
                         {
                             err = allied_set_trigline_src(handle, trigsrcs->arr[sel]);
                             update_err("Select trigger src", err);
@@ -954,7 +974,7 @@ public:
                     ImGui::Text("Link Speed (Current: %3lld MBps):", throughput / 1000 / 1000);
                     ImGui::SameLine();
                     ImGui::PushItemWidth(TEXT_BASE_WIDTH * 5);
-                    if (ImGui::InputInt("##speed", &speed, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
+                    if (ImGui::InputInt(speed_id.c_str(), &speed, 0, 0, capturing ? ImGuiInputTextFlags_ReadOnly : 0))
                     {
                         if (speed < throughput_min / 1000 / 1000)
                             speed = throughput_min / 1000 / 1000;
@@ -963,7 +983,7 @@ public:
                     }
                     ImGui::PopItemWidth();
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Update##Speed") && !capturing)
+                    if (ImGui::SmallButton(update_speed_id.c_str()) && !capturing)
                     {
                         update = true;
                     }
