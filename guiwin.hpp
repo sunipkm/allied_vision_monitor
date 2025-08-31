@@ -989,6 +989,8 @@ public:
                     }
                     if (update)
                     {
+                        err = allied_dequeue_capture(handle);
+                        update_err("Dequeue capture", err);
                         err = allied_set_throughput_limit(handle, speed * 1000 * 1000);
                         update_err("Set link speed", err);
                         if (err == VmbErrorSuccess)
@@ -1006,6 +1008,8 @@ public:
                         {
                             eprintlf("Error setting link speed to %d Bps: %s", speed * 1000 * 1000, allied_strerr(err));
                         }
+                        err = allied_queue_capture(handle, &Callback, (void *)this);
+                        update_err("Could not queue capture", err);
                         speed = throughput / 1000 / 1000;
                     }
                 }
